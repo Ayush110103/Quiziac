@@ -1,0 +1,42 @@
+# Node modules
+node_modules/
+
+# Build output
+.next/
+out/
+dist/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local env files
+.env
+.env.*.local
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor directories and files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Supabase generated files
+.supabase/
+supabase/.temp/
+supabase/migrations/.history/
+
+# Bolt/Boilerplate
+.bolt/
+
+# Misc
+coverage/
+*.log
