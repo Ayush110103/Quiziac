@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ChatInterface } from '@/components/chat-interface';
+import ChatInterface from '@/components/chat-interface';
 import { ArrowLeft, Brain, MessageCircle, BookOpen, Lightbulb, TrendingUp } from 'lucide-react';
 import { Quiz, QuizAttempt, supabase } from '@/lib/supabase';
 
@@ -114,7 +114,7 @@ export default function ReviewPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       {/* Header */}
       <header className="border-b bg-white/80 backdrop-blur-sm">
-        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button 
               variant="ghost" 
@@ -139,10 +139,10 @@ export default function ReviewPage() {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <main className="max-w-7xl mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 xl:grid-cols-5 gap-8">
           {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="xl:col-span-3 space-y-6">
             {/* Performance Overview */}
             <Card>
               <CardHeader>
@@ -313,12 +313,16 @@ export default function ReviewPage() {
             </Tabs>
           </div>
 
-          {/* AI Chat Sidebar */}
-          <div className="lg:col-span-1">
-            <ChatInterface 
-              context={`Quiz: ${quiz.title}, Topic: ${quiz.topic}, Questions: ${quiz.questions.length}`}
-              placeholder={`Ask about ${quiz.topic}...`}
-            />
+          {/* AI Chat Sidebar - Fixed Height with Scrollbar */}
+          <div className="xl:col-span-2">
+            <div className="sticky top-8 h-[calc(100vh-6rem)] overflow-hidden">
+              <div className="h-full max-h-[800px] overflow-y-auto">
+                <ChatInterface 
+                  context={`Quiz: ${quiz.title}, Topic: ${quiz.topic}, Questions: ${quiz.questions.length}`}
+                  placeholder={`Ask about ${quiz.topic}...`}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </main>
