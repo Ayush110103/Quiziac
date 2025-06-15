@@ -138,15 +138,25 @@ export function QuizCard({ quiz, onStart, showStats, averageScore, attempts, lat
             Start Quiz
           </Button>
           
-          {latestAttemptId && (
+          <div className="flex gap-2">
             <Button
               variant="outline"
-              className="w-full mt-2"
-              onClick={() => router.push(`/review/${latestAttemptId}`)}
+              className="w-full"
+              onClick={() => router.push(`/review/${quiz.id}`)}
             >
-              Review Last Attempt
+              Review Quiz
             </Button>
-          )}
+            
+            {latestAttemptId && (
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => router.push(`/review/${latestAttemptId}`)}
+              >
+                Review Last Attempt
+              </Button>
+            )}
+          </div>
         </div>
       </CardContent>
     </Card>
