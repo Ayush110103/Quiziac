@@ -70,7 +70,7 @@ export function QuizPlayer({ quiz, onComplete, onBack }: QuizPlayerProps) {
   };
 
   const handleFinishQuiz = async () => {
-    const score = selectedAnswers.reduce<number>((total, answer, index) => {
+    const score = selectedAnswers.reduce<number>((total: number, answer: number | null, index: number) => {
       if (answer === null) return total;
       return answer === quiz.questions[index].correct_answer ? total + 1 : total;
     }, 0);
@@ -107,7 +107,8 @@ export function QuizPlayer({ quiz, onComplete, onBack }: QuizPlayerProps) {
   };
 
   if (showResults) {
-    const score = selectedAnswers.reduce((total, answer, index) => {
+    const score = selectedAnswers.reduce<number>((total: number, answer: number | null, index: number) => {
+      if (answer === null) return total;
       return answer === quiz.questions[index].correct_answer ? total + 1 : total;
     }, 0);
     const percentage = Math.round((score / quiz.questions.length) * 100);
