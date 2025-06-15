@@ -31,20 +31,48 @@ export default function ReviewPage() {
   }, [quizId]);
 
   const loadQuizData = async () => {
-    const { data: quizData } = await supabase
+    // First try to fetch the quiz directly
+    let { data: quizData } = await supabase
       .from('quizzes')
       .select('*')
       .eq('id', quizId)
       .single();
 
-    const { data: attemptsData } = await supabase
-      .from('quiz_attempts')
-      .select('*')
-      .eq('quiz_id', quizId)
-      .order('completed_at', { ascending: false });
+    // If quiz not found, try to fetch it through the attempt
+    if (!quizData) {
+      const { data: attemptData } = await supabase
+        .from('quiz_attempts')
+        .select('quiz_id')
+        .eq('id', quizId)
+        .single();
 
-    if (quizData) setQuiz(quizData);
-    if (attemptsData) setAttempts(attemptsData);
+      if (attemptData) {
+        const { data: quizFromAttempt } = await supabase
+          .from('quizzes')
+          .select('*')
+          .eq('id', attemptData.quiz_id)
+          .single();
+        
+        if (quizFromAttempt) {
+          quizData = quizFromAttempt;
+        }
+      }
+    }
+
+    if (quizData) {
+      setQuiz(quizData);
+      
+      // Fetch attempts for the quiz
+      const { data: attemptsData } = await supabase
+        .from('quiz_attempts')
+        .select('*')
+        .eq('quiz_id', quizData.id)
+        .order('completed_at', { ascending: false });
+
+      if (attemptsData) {
+        setAttempts(attemptsData);
+      }
+    }
   };
 
   const generateRelatedTopics = () => {
