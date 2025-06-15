@@ -31,47 +31,56 @@ export default function ReviewPage() {
   }, [quizId]);
 
   const loadQuizData = async () => {
-    // First try to fetch the quiz directly
-    let { data: quizData } = await supabase
-      .from('quizzes')
-      .select('*')
-      .eq('id', quizId)
-      .single();
-
-    // If quiz not found, try to fetch it through the attempt
-    if (!quizData) {
-      const { data: attemptData } = await supabase
-        .from('quiz_attempts')
-        .select('quiz_id')
+    try {
+      // First try to fetch the quiz directly
+      let { data: quizData, error: quizError } = await supabase
+        .from('quizzes')
+        .select('*')
         .eq('id', quizId)
         .single();
 
-      if (attemptData) {
-        const { data: quizFromAttempt } = await supabase
-          .from('quizzes')
-          .select('*')
-          .eq('id', attemptData.quiz_id)
+      // If quiz not found, try to fetch it through the attempt
+      if (!quizData && !quizError) {
+        const { data: attemptData, error: attemptError } = await supabase
+          .from('quiz_attempts')
+          .select('quiz_id')
+          .eq('id', quizId)
           .single();
-        
-        if (quizFromAttempt) {
-          quizData = quizFromAttempt;
+
+        if (attemptData && !attemptError) {
+          const { data: quizFromAttempt, error: quizFromAttemptError } = await supabase
+            .from('quizzes')
+            .select('*')
+            .eq('id', attemptData.quiz_id)
+            .single();
+          
+          if (quizFromAttempt && !quizFromAttemptError) {
+            quizData = quizFromAttempt;
+          }
         }
       }
-    }
 
-    if (quizData) {
-      setQuiz(quizData);
-      
-      // Fetch attempts for the quiz
-      const { data: attemptsData } = await supabase
-        .from('quiz_attempts')
-        .select('*')
-        .eq('quiz_id', quizData.id)
-        .order('completed_at', { ascending: false });
+      if (quizData) {
+        setQuiz(quizData);
+        
+        // Fetch attempts for the quiz
+        const { data: attemptsData } = await supabase
+          .from('quiz_attempts')
+          .select('*')
+          .eq('quiz_id', quizData.id)
+          .order('completed_at', { ascending: false });
 
-      if (attemptsData) {
-        setAttempts(attemptsData);
+        if (attemptsData) {
+          setAttempts(attemptsData);
+        }
+      } else {
+        // Handle case where quiz is not found
+        console.error('Quiz not found');
+        router.push('/history'); // Redirect to history page
       }
+    } catch (error) {
+      console.error('Error loading quiz data:', error);
+      // Handle error appropriately
     }
   };
 
@@ -87,6 +96,8 @@ export default function ReviewPage() {
   };
 
   const loadTopicExplanation = async (topic: string) => {
+    if (!quiz) return;
+    
     setSelectedTopic(topic);
     setLoadingExplanation(true);
     
@@ -97,7 +108,7 @@ export default function ReviewPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          topic: `${topic} related to ${quiz?.topic}`
+          topic: `${topic} related to ${quiz.topic}`
         }),
       });
 
@@ -319,7 +330,7 @@ export default function ReviewPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="min-h-[300px]">
-              {quiz?.topic && (
+              {quiz && quiz.topic && (
                 <ChatInterface 
                   context={`Quiz: ${quiz.title}, Topic: ${quiz.topic}`}
                   placeholder={`Ask about ${quiz.topic}...`}
