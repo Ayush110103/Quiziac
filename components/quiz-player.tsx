@@ -6,11 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Clock, CheckCircle, XCircle, ArrowRight, ArrowLeft } from 'lucide-react';
-import { Quiz, Question, supabase } from '@/lib/supabase';
+import { Quiz, Question, supabase, QuizAttempt } from '@/lib/supabase';
+import { useRouter } from 'next/navigation';
 
 interface QuizPlayerProps {
   quiz: Quiz;
-  onComplete: (score: number, answers: number[], timeTaken: number) => void;
+  onComplete: (score: number, answers: number[], timeTaken: number, attemptId: string) => void;
   onBack: () => void;
 }
 
@@ -22,9 +23,12 @@ export function QuizPlayer({ quiz, onComplete, onBack }: QuizPlayerProps) {
   const [showResults, setShowResults] = useState(false);
   const [startTime] = useState(Date.now());
   const [timeElapsed, setTimeElapsed] = useState(0);
+  const [attempts, setAttempts] = useState<QuizAttempt[]>([]);
 
   const currentQuestion = quiz.questions[currentQuestionIndex];
   const progress = ((currentQuestionIndex + 1) / quiz.questions.length) * 100;
+
+  const router = useRouter();
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -33,6 +37,17 @@ export function QuizPlayer({ quiz, onComplete, onBack }: QuizPlayerProps) {
 
     return () => clearInterval(timer);
   }, [startTime]);
+
+  useEffect(() => {
+    const loadAttempts = async () => {
+      const { data } = await supabase
+        .from('quiz_attempts')
+        .select('*')
+        .order('completed_at', { ascending: false });
+      if (data) setAttempts(data);
+    };
+    loadAttempts();
+  }, []);
 
   const handleAnswerSelect = (answerIndex: number) => {
     const newAnswers = [...selectedAnswers];
@@ -55,29 +70,34 @@ export function QuizPlayer({ quiz, onComplete, onBack }: QuizPlayerProps) {
   };
 
   const handleFinishQuiz = async () => {
-    const score = selectedAnswers.reduce((total, answer, index) => {
+    const score = selectedAnswers.reduce<number>((total, answer, index) => {
+      if (answer === null) return total;
       return answer === quiz.questions[index].correct_answer ? total + 1 : total;
     }, 0);
 
     const timeTaken = Math.floor((Date.now() - startTime) / 1000);
-    
+
     // Save attempt to database
-    await supabase
+    const { data, error } = await supabase
       .from('quiz_attempts')
       .insert({
         quiz_id: quiz.id,
         score,
         total_questions: quiz.questions.length,
-        answers: selectedAnswers,
-        time_taken: timeTaken
-      });
+        answers: selectedAnswers.map(a => a === null ? -1 : a),
+        time_taken: timeTaken,
+        completed_at: new Date().toISOString()
+      })
+      .select()
+      .single();
 
-    setShowResults(true);
-    onComplete(
-      score,
-      selectedAnswers.map(a => a === null ? -1 : a),
-      timeTaken
-    );
+    if (data && !error) {
+      // Redirect to review page with the attempt ID
+      router.push(`/review/${data.id}`);
+    } else {
+      // handle error
+      alert('Failed to save attempt!');
+    }
   };
 
   const formatTime = (seconds: number) => {

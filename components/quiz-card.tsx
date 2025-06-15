@@ -1,8 +1,13 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Clock, BookOpen, BarChart3 } from 'lucide-react';
+import { Clock, BookOpen, BarChart3, History } from 'lucide-react';
 import { Quiz } from '@/lib/supabase';
+import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
+import { QuizAttempt } from '@/lib/supabase';
+import { QuizPlayer } from '@/components/quiz-player';
 
 interface QuizCardProps {
   quiz: Quiz;
@@ -10,9 +15,33 @@ interface QuizCardProps {
   showStats?: boolean;
   averageScore?: number;
   attempts?: number;
+  latestAttemptId?: string;
 }
 
-export function QuizCard({ quiz, onStart, showStats, averageScore, attempts }: QuizCardProps) {
+export function QuizCard({ quiz, onStart, showStats, averageScore, attempts, latestAttemptId }: QuizCardProps) {
+  const router = useRouter();
+  const [localAttempts, setLocalAttempts] = useState<QuizAttempt[]>([]);
+  const [currentQuiz, setCurrentQuiz] = useState<Quiz | null>(null);
+  const [lastAttemptTime, setLastAttemptTime] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadAttempts = async () => {
+      const { data } = await supabase
+        .from('quiz_attempts')
+        .select('*')
+        .eq('quiz_id', quiz.id)
+        .order('completed_at', { ascending: false })
+        .limit(1);
+      
+      if (data && data.length > 0) {
+        const lastAttempt = data[0];
+        const date = new Date(lastAttempt.completed_at);
+        setLastAttemptTime(date.toLocaleDateString() + ' ' + date.toLocaleTimeString());
+      }
+    };
+    loadAttempts();
+  }, [quiz.id]);
+
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty.toLowerCase()) {
       case 'easy':
@@ -25,6 +54,29 @@ export function QuizCard({ quiz, onStart, showStats, averageScore, attempts }: Q
         return 'bg-gray-100 text-gray-800 hover:bg-gray-200';
     }
   };
+
+  const handleQuizComplete = (
+    score: number,
+    answers: number[],
+    timeTaken: number,
+    attemptId: string
+  ) => {
+    router.push(`/review/${attemptId}`);
+  };
+
+  const handleStartQuiz = (quiz: Quiz) => {
+    setCurrentQuiz(quiz);
+  };
+
+  if (currentQuiz) {
+    return (
+      <QuizPlayer
+        quiz={currentQuiz}
+        onComplete={handleQuizComplete}
+        onBack={() => setCurrentQuiz(null)}
+      />
+    );
+  }
 
   return (
     <Card className="h-full group hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
@@ -71,6 +123,13 @@ export function QuizCard({ quiz, onStart, showStats, averageScore, attempts }: Q
               </span>
             </div>
           )}
+
+          {lastAttemptTime && (
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+              <History className="h-4 w-4" />
+              <span>Last attempt: {lastAttemptTime}</span>
+            </div>
+          )}
           
           <Button 
             onClick={() => onStart(quiz)}
@@ -78,6 +137,16 @@ export function QuizCard({ quiz, onStart, showStats, averageScore, attempts }: Q
           >
             Start Quiz
           </Button>
+          
+          {latestAttemptId && (
+            <Button
+              variant="outline"
+              className="w-full mt-2"
+              onClick={() => router.push(`/review/${latestAttemptId}`)}
+            >
+              Review Last Attempt
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>

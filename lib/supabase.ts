@@ -13,15 +13,9 @@ export const supabase = createClient(
   {
     auth: {
       persistSession: false
-    },
-    realtime: {
-      params: {
-        eventsPerSecond: 10
-      }
     }
   }
 );
-
 
 supabase.from('quizzes').select('count').single()
   .then(({ data, error }) => {
