@@ -101,7 +101,7 @@ export default function ChatInterface({ context, placeholder = "Ask me anything.
         
         <CardContent className="flex-1 flex flex-col p-0 min-h-0">
           {/* Messages Container with Scroll */}
-          <div className="flex-1 overflow-hidden px-4">
+          <div className="max-h-[480px] overflow-y-auto px-4">
             <ScrollArea className="h-full">
               <div className="space-y-4 py-2">
                 {messages.length === 0 && (
