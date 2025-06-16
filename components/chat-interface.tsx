@@ -36,11 +36,11 @@ export default function ChatInterface({ context, placeholder = "Ask me anything.
     return () => clearTimeout(timer);
   }, []);
 
-  // Auto-scroll to bottom when new messages are added (only after component is mounted)
+  
   const scrollToBottom = () => {
-    if (!isMounted) return; // Don't scroll during initial mount
+    if (!isMounted) return; 
     
-    // Use a more controlled scroll method
+   
     if (messagesEndRef.current && scrollAreaRef.current) {
       const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
       if (scrollContainer) {
@@ -174,7 +174,7 @@ export default function ChatInterface({ context, placeholder = "Ask me anything.
                   </div>
                 )}
                 
-                {/* Invisible div to scroll to - only renders after component is mounted */}
+                
                 {isMounted && <div ref={messagesEndRef} />}
               </div>
             </ScrollArea>

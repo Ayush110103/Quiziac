@@ -34,8 +34,6 @@ Thumbs.db
 supabase/.temp/
 supabase/migrations/.history/
 
-# Bolt/Boilerplate
-.bolt/
 
 # Misc
 coverage/
