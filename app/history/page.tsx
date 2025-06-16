@@ -98,7 +98,6 @@ export default function HistoryPage() {
       </div>
 
       <h1 className="text-3xl font-bold mb-8">Quiz History</h1>
-      {/* Filters and Search */}
       <Card className="mb-8">
         <CardContent className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
