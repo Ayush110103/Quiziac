@@ -9,6 +9,7 @@ import { useState, useEffect } from 'react';
 import { ArrowLeft, Search, Filter } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { QuizPlayer } from '@/components/quiz-player';
 
 export default function HistoryPage() {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
@@ -16,6 +17,7 @@ export default function HistoryPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [difficultyFilter, setDifficultyFilter] = useState('all');
   const [sortBy, setSortBy] = useState('recent');
+  const [currentQuiz, setCurrentQuiz] = useState<Quiz | null>(null);
 
   useEffect(() => {
     loadQuizzes();
@@ -63,6 +65,25 @@ export default function HistoryPage() {
     setFilteredQuizzes(filtered);
   };
 
+  const handleStartQuiz = (quiz: Quiz) => {
+    setCurrentQuiz(quiz);
+  };
+
+  if (currentQuiz) {
+    return (
+      <MainLayout>
+        <QuizPlayer 
+          quiz={currentQuiz} 
+          onComplete={() => {
+            setCurrentQuiz(null);
+            loadQuizzes();
+          }}
+          onBack={() => setCurrentQuiz(null)}
+        />
+      </MainLayout>
+    );
+  }
+
   return (
     <MainLayout>
       <div className="mb-8">
@@ -77,7 +98,6 @@ export default function HistoryPage() {
       </div>
 
       <h1 className="text-3xl font-bold mb-8">Quiz History</h1>
-
       {/* Filters and Search */}
       <Card className="mb-8">
         <CardContent className="p-6">
@@ -133,9 +153,7 @@ export default function HistoryPage() {
             <QuizCard
               key={quiz.id}
               quiz={quiz}
-              onStart={() => {
-              
-              }}
+              onStart={handleStartQuiz}
             />
           ))}
         </div>
