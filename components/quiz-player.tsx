@@ -92,6 +92,8 @@ export function QuizPlayer({ quiz, onComplete, onBack }: QuizPlayerProps) {
       .single();
 
     if (data && !error) {
+      // Call onComplete with the attempt data
+      onComplete(score, selectedAnswers.map(a => a === null ? -1 : a), timeTaken, data.id);
       // Redirect to review page with the attempt ID
       router.push(`/review/${data.id}`);
     } else {

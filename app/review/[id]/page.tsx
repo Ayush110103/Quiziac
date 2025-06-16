@@ -32,35 +32,46 @@ export default function ReviewPage() {
 
   const loadQuizData = async () => {
     try {
-      // First try to fetch the quiz directly
-      let { data: quizData, error: quizError } = await supabase
+      // First try to fetch the attempt
+      const { data: attemptData, error: attemptError } = await supabase
+        .from('quiz_attempts')
+        .select('quiz_id')
+        .eq('id', quizId)
+        .single();
+
+      if (attemptData && !attemptError) {
+        // If attempt found, fetch the quiz
+        const { data: quizData, error: quizError } = await supabase
+          .from('quizzes')
+          .select('*')
+          .eq('id', attemptData.quiz_id)
+          .single();
+
+        if (quizData && !quizError) {
+          setQuiz(quizData);
+          
+          // Fetch attempts for the quiz
+          const { data: attemptsData } = await supabase
+            .from('quiz_attempts')
+            .select('*')
+            .eq('quiz_id', quizData.id)
+            .order('completed_at', { ascending: false });
+
+          if (attemptsData) {
+            setAttempts(attemptsData);
+          }
+          return;
+        }
+      }
+
+      // If attempt not found, try to fetch the quiz directly
+      const { data: quizData, error: quizError } = await supabase
         .from('quizzes')
         .select('*')
         .eq('id', quizId)
         .single();
 
-      // If quiz not found, try to fetch it through the attempt
-      if (!quizData && !quizError) {
-        const { data: attemptData, error: attemptError } = await supabase
-          .from('quiz_attempts')
-          .select('quiz_id')
-          .eq('id', quizId)
-          .single();
-
-        if (attemptData && !attemptError) {
-          const { data: quizFromAttempt, error: quizFromAttemptError } = await supabase
-            .from('quizzes')
-            .select('*')
-            .eq('id', attemptData.quiz_id)
-            .single();
-          
-          if (quizFromAttempt && !quizFromAttemptError) {
-            quizData = quizFromAttempt;
-          }
-        }
-      }
-
-      if (quizData) {
+      if (quizData && !quizError) {
         setQuiz(quizData);
         
         // Fetch attempts for the quiz
@@ -74,13 +85,13 @@ export default function ReviewPage() {
           setAttempts(attemptsData);
         }
       } else {
-        // Handle case where quiz is not found
+        // Handle case where neither attempt nor quiz is found
         console.error('Quiz not found');
-        router.push('/history'); // Redirect to history page
+        router.push('/history');
       }
     } catch (error) {
       console.error('Error loading quiz data:', error);
-      // Handle error appropriately
+      router.push('/history');
     }
   };
 
