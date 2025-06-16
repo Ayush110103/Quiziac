@@ -23,17 +23,37 @@ export default function ChatInterface({ context, placeholder = "Ask me anything.
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom when new messages are added
+  // Track when component is fully mounted
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsMounted(true);
+    }, 1500); // Wait for parent component's scroll prevention to finish
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Auto-scroll to bottom when new messages are added (only after component is mounted)
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (!isMounted) return; // Don't scroll during initial mount
+    
+    // Use a more controlled scroll method
+    if (messagesEndRef.current && scrollAreaRef.current) {
+      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      }
+    }
   };
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (messages.length > 0) { // Only scroll if there are messages
+      scrollToBottom();
+    }
+  }, [messages, isMounted]);
 
   const sendMessage = async (e?: React.FormEvent | React.MouseEvent) => {
     e?.preventDefault();
@@ -102,7 +122,7 @@ export default function ChatInterface({ context, placeholder = "Ask me anything.
         <CardContent className="flex-1 flex flex-col p-0 min-h-0">
           {/* Messages Container with Scroll */}
           <div className="max-h-[480px] overflow-y-auto px-4">
-            <ScrollArea className="h-full">
+            <ScrollArea className="h-full" ref={scrollAreaRef}>
               <div className="space-y-4 py-2">
                 {messages.length === 0 && (
                   <div className="text-center text-muted-foreground py-8">
@@ -154,8 +174,8 @@ export default function ChatInterface({ context, placeholder = "Ask me anything.
                   </div>
                 )}
                 
-                {/* Invisible div to scroll to */}
-                <div ref={messagesEndRef} />
+                {/* Invisible div to scroll to - only renders after component is mounted */}
+                {isMounted && <div ref={messagesEndRef} />}
               </div>
             </ScrollArea>
           </div>
