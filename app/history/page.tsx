@@ -134,7 +134,7 @@ export default function HistoryPage() {
               key={quiz.id}
               quiz={quiz}
               onStart={() => {
-                // Handle quiz start
+              
               }}
             />
           ))}

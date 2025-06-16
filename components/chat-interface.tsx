@@ -31,7 +31,7 @@ export default function ChatInterface({ context, placeholder = "Ask me anything.
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsMounted(true);
-    }, 1500); // Wait for parent component's scroll prevention to finish
+    }, 1500);
 
     return () => clearTimeout(timer);
   }, []);

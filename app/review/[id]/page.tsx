@@ -218,9 +218,7 @@ export default function ReviewPage() {
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-5 gap-8">
-          {/* Main Content */}
           <div className="xl:col-span-3 space-y-6">
-            {/* Performance Overview */}
             <Card className="dark:bg-gray-800">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
