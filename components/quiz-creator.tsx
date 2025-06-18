@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Slider } from '@/components/ui/slider';
 import { Loader2, Sparkles, Brain } from 'lucide-react';
 import { Quiz } from '@/lib/supabase';
+import { generate_quiz } from '@/action/generation_quiz';
 
 interface QuizCreatorProps {
   onQuizCreated: (quiz: Quiz) => void;
@@ -16,9 +17,12 @@ interface QuizCreatorProps {
 
 export function QuizCreator({ onQuizCreated }: QuizCreatorProps) {
   const [topic, setTopic] = useState('');
-  const [difficulty, setDifficulty] = useState('medium');
+  const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
   const [numQuestions, setNumQuestions] = useState([5]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const handleSetDifficulty = (value: string) => {
+    setDifficulty(value as 'easy' | 'medium' | 'hard');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,16 +30,10 @@ export function QuizCreator({ onQuizCreated }: QuizCreatorProps) {
 
     setIsGenerating(true);
     try {
-      const response = await fetch('/api/generate-quiz', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          topic: topic.trim(),
-          difficulty,
-          numQuestions: numQuestions[0],
-        }),
+      const response  = await generate_quiz({
+        topic,
+        difficulty,
+        numQuestions: numQuestions[0]
       });
 
       if (!response.ok) {
@@ -112,7 +110,7 @@ export function QuizCreator({ onQuizCreated }: QuizCreatorProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label className="text-sm font-medium">Difficulty Level</Label>
-              <Select value={difficulty} onValueChange={setDifficulty} disabled={isGenerating}>
+              <Select value={difficulty} onValueChange={handleSetDifficulty} disabled={isGenerating}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
