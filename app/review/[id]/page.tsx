@@ -101,6 +101,13 @@ export default function ReviewPage() {
             .order('completed_at', { ascending: false });
 
           if (attemptsData) {
+            console.log('Loaded attempts data:', attemptsData);
+            console.log('Attempts with scores:', attemptsData.map(a => ({
+              id: a.id,
+              score: a.score,
+              total_questions: a.total_questions,
+              percentage: Math.round((a.score / a.total_questions) * 100)
+            })));
             setAttempts(attemptsData);
           }
           return;
@@ -125,6 +132,7 @@ export default function ReviewPage() {
           .order('completed_at', { ascending: false });
 
         if (attemptsData) {
+          console.log('Loaded attempts data (direct quiz):', attemptsData);
           setAttempts(attemptsData);
         }
       } else {
@@ -192,15 +200,39 @@ export default function ReviewPage() {
   }
 
   const bestAttempt = attempts.length > 0 
-    ? attempts.reduce((best, current) => 
-        (current.score / current.total_questions) > (best.score / best.total_questions) ? current : best
-      )
+    ? attempts.reduce((best, current) => {
+        const currentPercentage = (current.score / current.total_questions) * 100;
+        const bestPercentage = (best.score / best.total_questions) * 100;
+        return currentPercentage > bestPercentage ? current : best;
+      })
     : null;
 
   const averageScore = attempts.length > 0
-    ? Math.round(attempts.reduce((sum, attempt) => 
-        sum + (attempt.score / attempt.total_questions) * 100, 0) / attempts.length)
+    ? Math.round(attempts.reduce((sum, attempt) => {
+        const percentage = (attempt.score / attempt.total_questions) * 100;
+        return sum + percentage;
+      }, 0) / attempts.length)
     : 0;
+
+  // Debug logging for score calculations
+  if (attempts.length > 0) {
+    console.log('Score calculations:', {
+      attemptsCount: attempts.length,
+      attempts: attempts.map(a => ({
+        id: a.id,
+        score: a.score,
+        total_questions: a.total_questions,
+        percentage: Math.round((a.score / a.total_questions) * 100)
+      })),
+      bestAttempt: bestAttempt ? {
+        id: bestAttempt.id,
+        score: bestAttempt.score,
+        total_questions: bestAttempt.total_questions,
+        percentage: Math.round((bestAttempt.score / bestAttempt.total_questions) * 100)
+      } : null,
+      averageScore
+    });
+  }
 
   return (
     <MainLayout>
@@ -238,7 +270,7 @@ export default function ReviewPage() {
                   </div>
                   <div className="text-center p-4 bg-purple-50 dark:bg-purple-900 rounded-lg">
                     <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                      {bestAttempt ? Math.round((bestAttempt.score / bestAttempt.total_questions) * 100) : 0}%
+                      {bestAttempt ? Math.round(bestAttempt.score / bestAttempt.total_questions * 100) : 0}%
                     </div>
                     <div className="text-sm text-muted-foreground">Best Score</div>
                   </div>

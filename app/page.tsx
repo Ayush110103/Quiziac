@@ -51,13 +51,16 @@ export default function Home() {
     const { data: attempts } = await supabase.from('quiz_attempts').select('score, total_questions');
     
     if (quizzes && attempts) {
-      const totalScore = attempts.reduce((sum, attempt) => sum + attempt.score, 0);
-      const totalPossible = attempts.reduce((sum, attempt) => sum + attempt.total_questions, 0);
+      // Calculate average score as percentage
+      const totalPercentage = attempts.reduce((sum, attempt) => {
+        const percentage = (attempt.score / attempt.total_questions) * 100;
+        return sum + percentage;
+      }, 0);
       
       setStats({
         totalQuizzes: quizzes.length,
         totalAttempts: attempts.length,
-        averageScore: totalPossible > 0 ? Math.round((totalScore / totalPossible) * 100) : 0
+        averageScore: attempts.length > 0 ? Math.round(totalPercentage / attempts.length) : 0
       });
     }
   };
