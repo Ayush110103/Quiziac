@@ -1,47 +1,48 @@
 'use client';
 
+import Link from "next/link"
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase-client';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import Link from 'next/link';
+
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [message, setMessage] = useState('');
-  const router = useRouter();
-  const supabase = createClient();
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setMessage('');
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      setMessage(error.message);
-    } else {
-      router.push('/');
-    }
-  };
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [message, setMessage] = useState('');
+    const router = useRouter();
+    const supabase = createClient();
+  
+    const handleLogin = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setMessage('');
+  
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+  
+      if (error) {
+        setMessage(error.message);
+      } else {
+        router.push('/');
+        router.refresh();
+      }
+    };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-      <Card className="mx-auto max-w-sm">
-        <CardHeader>
-          <CardTitle className="text-2xl">Login</CardTitle>
-          <CardDescription>
-            Enter your email below to login to your account
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+    <div className="w-full lg:grid lg:min-h-screen lg:grid-cols-2">
+      <div className="flex items-center justify-center py-12">
+        <div className="mx-auto grid w-[350px] gap-6">
+          <div className="grid gap-2 text-center">
+            <h1 className="text-3xl font-bold">Login</h1>
+            <p className="text-balance text-muted-foreground">
+              Enter your email below to login to your account
+            </p>
+          </div>
           <form onSubmit={handleLogin} className="grid gap-4">
             <div className="grid gap-2">
               <Label htmlFor="email">Email</Label>
@@ -55,9 +56,7 @@ export default function LoginPage() {
               />
             </div>
             <div className="grid gap-2">
-              <div className="flex items-center">
-                <Label htmlFor="password">Password</Label>
-              </div>
+              <Label htmlFor="password">Password</Label>
               <Input 
                 id="password" 
                 type="password" 
@@ -77,8 +76,14 @@ export default function LoginPage() {
               Sign up
             </Link>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
+      <div className="hidden bg-muted lg:block">
+        <div className="flex flex-col h-full items-center justify-center">
+            <h1 className="text-4xl font-bold p-4">Welcome to Quiziac</h1>
+            <p className="text-xl text-muted-foreground">The best place to test your knowledge</p>
+        </div>
+      </div>
     </div>
-  );
+  )
 } 
