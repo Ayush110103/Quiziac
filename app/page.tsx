@@ -7,11 +7,13 @@ import { QuizCreator } from '@/components/quiz-creator';
 import { QuizPlayer } from '@/components/quiz-player';
 import { QuizCard } from '@/components/quiz-card';
 import { Brain, History, TrendingUp, Users, Sparkles, BookOpen } from 'lucide-react';
-import { Quiz, supabase } from '@/lib/supabase';
+import { Quiz } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase-client';
 import { MainLayout } from '@/components/layout/main-layout';
 import { useQuizPersistence } from '@/hooks/use-quiz-persistence';
 
 export default function Home() {
+  const supabase = createClient();
   const [currentView, setCurrentView] = useState<'home' | 'create' | 'play'>('home');
   const [recentQuizzes, setRecentQuizzes] = useState<Quiz[]>([]);
   const [stats, setStats] = useState({
