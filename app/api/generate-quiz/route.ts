@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateQuiz } from '@/lib/gemini';
-import { supabase } from '@/lib/supabase';
+import { createServerClient } from '@/lib/supabase-server';
 
 export async function POST(request: NextRequest) {
+  const supabase = createServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
     const { topic, difficulty, numQuestions } = body;
@@ -16,15 +23,17 @@ export async function POST(request: NextRequest) {
     const quizData = await generateQuiz({
       topic,
       difficulty,
-      numQuestions: parseInt(numQuestions)
+      numQuestions: parseInt(numQuestions, 10)
     });
+
     const { data: quiz, error } = await supabase
       .from('quizzes')
       .insert({
         title: quizData.title,
         topic,
         difficulty,
-        questions: quizData.questions
+        questions: quizData.questions,
+        user_id: user.id,
       })
       .select()
       .single();

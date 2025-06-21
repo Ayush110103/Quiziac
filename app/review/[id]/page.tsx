@@ -8,13 +8,15 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ChatInterface from '@/components/chat-interface';
 import { ArrowLeft, Brain, MessageCircle, BookOpen, Lightbulb, TrendingUp } from 'lucide-react';
-import { Quiz, QuizAttempt, supabase } from '@/lib/supabase';
+import { Quiz, QuizAttempt } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase-client';
 import { MainLayout } from '@/components/layout/main-layout';
 
 export default function ReviewPage() {
   const params = useParams();
   const quizId = params.id as string;
   const router = useRouter();
+  const supabase = createClient();
   
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [attempts, setAttempts] = useState<QuizAttempt[]>([]);
@@ -87,28 +89,29 @@ export default function ReviewPage() {
         const { data: quizData, error: quizError } = await supabase
           .from('quizzes')
           .select('*')
-          .eq('id', attemptData.quiz_id)
+          .eq('id', (attemptData as QuizAttempt).quiz_id)
           .single();
 
         if (quizData && !quizError) {
-          setQuiz(quizData);
+          setQuiz(quizData as Quiz);
           
           // Fetch attempts for the quiz
           const { data: attemptsData } = await supabase
             .from('quiz_attempts')
             .select('*')
-            .eq('quiz_id', quizData.id)
+            .eq('quiz_id', (quizData as Quiz).id)
             .order('completed_at', { ascending: false });
 
           if (attemptsData) {
-            console.log('Loaded attempts data:', attemptsData);
-            console.log('Attempts with scores:', attemptsData.map(a => ({
+            const typedAttempts = attemptsData as QuizAttempt[];
+            console.log('Loaded attempts data:', typedAttempts);
+            console.log('Attempts with scores:', typedAttempts.map(a => ({
               id: a.id,
               score: a.score,
               total_questions: a.total_questions,
               percentage: Math.round((a.score / a.total_questions) * 100)
             })));
-            setAttempts(attemptsData);
+            setAttempts(typedAttempts);
           }
           return;
         }
@@ -122,18 +125,18 @@ export default function ReviewPage() {
         .single();
 
       if (quizData && !quizError) {
-        setQuiz(quizData);
+        setQuiz(quizData as Quiz);
         
         // Fetch attempts for the quiz
         const { data: attemptsData } = await supabase
           .from('quiz_attempts')
           .select('*')
-          .eq('quiz_id', quizData.id)
+          .eq('quiz_id', (quizData as Quiz).id)
           .order('completed_at', { ascending: false });
 
         if (attemptsData) {
           console.log('Loaded attempts data (direct quiz):', attemptsData);
-          setAttempts(attemptsData);
+          setAttempts(attemptsData as QuizAttempt[]);
         }
       } else {
         // Handle case where neither attempt nor quiz is found

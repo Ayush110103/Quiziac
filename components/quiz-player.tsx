@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Clock, CheckCircle, XCircle, ArrowRight, ArrowLeft, Ban } from 'lucide-react';
-import { Quiz, Question, supabase, QuizAttempt } from '@/lib/supabase';
+import { Quiz, Question, QuizAttempt } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase-client';
 import { useRouter } from 'next/navigation';
 import { useQuizPersistence } from '@/hooks/use-quiz-persistence';
 import {
@@ -33,6 +34,7 @@ export function QuizPlayer({ quiz, onComplete, onBack }: QuizPlayerProps) {
   const [timeElapsed, setTimeElapsed] = useState(0);
   const [attempts, setAttempts] = useState<QuizAttempt[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const supabase = createClient();
 
   // Use persisted state or initialize new state
   const currentQuestionIndex = quizState?.currentQuestionIndex || 0;
@@ -103,10 +105,10 @@ export function QuizPlayer({ quiz, onComplete, onBack }: QuizPlayerProps) {
         .from('quiz_attempts')
         .select('*')
         .order('completed_at', { ascending: false });
-      if (data) setAttempts(data);
+      if (data) setAttempts(data as QuizAttempt[]);
     };
     loadAttempts();
-  }, []);
+  }, [supabase]);
 
   const handleAnswerSelect = (answerIndex: number) => {
     console.log('Answer selected:', {
@@ -181,6 +183,15 @@ export function QuizPlayer({ quiz, onComplete, onBack }: QuizPlayerProps) {
       unattemptedAnswers: finalAnswers.filter(answer => answer === -1).length
     });
     console.log('=== END QUIZ FINISH DEBUG ===');
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.error('User not found, cannot save attempt');
+      alert('You must be logged in to save your attempt.');
+      setIsSubmitting(false);
+      router.push('/login');
+      return;
+    }
     
     const { data, error } = await supabase
       .from('quiz_attempts')
@@ -190,10 +201,11 @@ export function QuizPlayer({ quiz, onComplete, onBack }: QuizPlayerProps) {
         total_questions: quiz.questions.length,
         answers: finalAnswers,
         time_taken: timeTaken,
-        completed_at: new Date().toISOString()
+        completed_at: new Date().toISOString(),
+        user_id: user.id,
       })
       .select()
-      .single();
+      .single<QuizAttempt>();
 
     if (data && !error) {
       console.log('Quiz attempt saved successfully:', data);

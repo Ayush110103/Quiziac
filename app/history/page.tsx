@@ -4,13 +4,15 @@ import { MainLayout } from '@/components/layout/main-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { QuizCard } from '@/components/quiz-card';
-import { Quiz, supabase } from '@/lib/supabase';
+import { Quiz } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase-client';
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Search, Filter } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { QuizPlayer } from '@/components/quiz-player';
 import { useQuizPersistence } from '@/hooks/use-quiz-persistence';
+import { useRouter } from 'next/navigation';
 
 export default function HistoryPage() {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
@@ -20,6 +22,8 @@ export default function HistoryPage() {
   const [sortBy, setSortBy] = useState('recent');
 
   const { quizState, startQuiz, clearQuiz, isLoading } = useQuizPersistence();
+  const supabase = createClient();
+  const router = useRouter();
 
   useEffect(() => {
     loadQuizzes();
@@ -36,7 +40,7 @@ export default function HistoryPage() {
       .order('created_at', { ascending: false });
     
     if (data) {
-      setQuizzes(data);
+      setQuizzes(data as Quiz[]);
     }
   };
 
@@ -111,7 +115,7 @@ export default function HistoryPage() {
       <div className="mb-8">
         <Button 
           variant="ghost" 
-          onClick={() => window.location.href = '/'}
+          onClick={() => router.push('/')}
           className="mb-4"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
