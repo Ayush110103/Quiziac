@@ -10,6 +10,7 @@ import { ArrowLeft, Search, Filter } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { QuizPlayer } from '@/components/quiz-player';
+import { useQuizPersistence } from '@/hooks/use-quiz-persistence';
 
 export default function HistoryPage() {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
@@ -17,7 +18,8 @@ export default function HistoryPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [difficultyFilter, setDifficultyFilter] = useState('all');
   const [sortBy, setSortBy] = useState('recent');
-  const [currentQuiz, setCurrentQuiz] = useState<Quiz | null>(null);
+
+  const { quizState, startQuiz, clearQuiz, isLoading } = useQuizPersistence();
 
   useEffect(() => {
     loadQuizzes();
@@ -66,20 +68,40 @@ export default function HistoryPage() {
   };
 
   const handleStartQuiz = (quiz: Quiz) => {
-    setCurrentQuiz(quiz);
+    startQuiz(quiz);
   };
 
-  if (currentQuiz) {
+  const handleQuizComplete = () => {
+    clearQuiz();
+    loadQuizzes();
+  };
+
+  const handleBackToHistory = () => {
+    clearQuiz();
+  };
+
+  if (quizState) {
     return (
       <MainLayout>
         <QuizPlayer 
-          quiz={currentQuiz} 
-          onComplete={() => {
-            setCurrentQuiz(null);
-            loadQuizzes();
-          }}
-          onBack={() => setCurrentQuiz(null)}
+          quiz={quizState.quiz} 
+          onComplete={handleQuizComplete}
+          onBack={handleBackToHistory}
         />
+      </MainLayout>
+    );
+  }
+
+  // Show loading state while checking for persisted quiz
+  if (isLoading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading...</p>
+          </div>
+        </div>
       </MainLayout>
     );
   }

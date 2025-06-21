@@ -9,10 +9,10 @@ import { QuizCard } from '@/components/quiz-card';
 import { Brain, History, TrendingUp, Users, Sparkles, BookOpen } from 'lucide-react';
 import { Quiz, supabase } from '@/lib/supabase';
 import { MainLayout } from '@/components/layout/main-layout';
+import { useQuizPersistence } from '@/hooks/use-quiz-persistence';
 
 export default function Home() {
   const [currentView, setCurrentView] = useState<'home' | 'create' | 'play'>('home');
-  const [currentQuiz, setCurrentQuiz] = useState<Quiz | null>(null);
   const [recentQuizzes, setRecentQuizzes] = useState<Quiz[]>([]);
   const [stats, setStats] = useState({
     totalQuizzes: 0,
@@ -20,10 +20,19 @@ export default function Home() {
     averageScore: 0
   });
 
+  const { quizState, startQuiz, clearQuiz, isLoading } = useQuizPersistence();
+
   useEffect(() => {
     loadRecentQuizzes();
     loadStats();
   }, []);
+
+  // Check if there's an active quiz and show it
+  useEffect(() => {
+    if (quizState && !isLoading) {
+      setCurrentView('play');
+    }
+  }, [quizState, isLoading]);
 
   const loadRecentQuizzes = async () => {
     const { data: quizzes } = await supabase
@@ -54,20 +63,25 @@ export default function Home() {
   };
 
   const handleQuizCreated = (quiz: Quiz) => {
-    setCurrentQuiz(quiz);
+    startQuiz(quiz);
     setCurrentView('play');
     loadRecentQuizzes();
   };
 
   const handleQuizComplete = () => {
     setCurrentView('home');
-    setCurrentQuiz(null);
+    clearQuiz();
     loadStats();
   };
 
   const handleStartQuiz = (quiz: Quiz) => {
-    setCurrentQuiz(quiz);
+    startQuiz(quiz);
     setCurrentView('play');
+  };
+
+  const handleBackToHome = () => {
+    setCurrentView('home');
+    clearQuiz();
   };
 
   if (currentView === 'create') {
@@ -87,14 +101,28 @@ export default function Home() {
     );
   }
 
-  if (currentView === 'play' && currentQuiz) {
+  if (currentView === 'play' && quizState) {
     return (
       <MainLayout>
         <QuizPlayer 
-          quiz={currentQuiz} 
+          quiz={quizState.quiz} 
           onComplete={handleQuizComplete}
-          onBack={() => setCurrentView('home')}
+          onBack={handleBackToHome}
         />
+      </MainLayout>
+    );
+  }
+
+  // Show loading state while checking for persisted quiz
+  if (isLoading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading...</p>
+          </div>
+        </div>
       </MainLayout>
     );
   }

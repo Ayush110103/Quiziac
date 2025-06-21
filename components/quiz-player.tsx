@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Clock, CheckCircle, XCircle, ArrowRight, ArrowLeft } from 'lucide-react';
 import { Quiz, Question, supabase, QuizAttempt } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import { useQuizPersistence } from '@/hooks/use-quiz-persistence';
 
 interface QuizPlayerProps {
   quiz: Quiz;
@@ -16,19 +17,39 @@ interface QuizPlayerProps {
 }
 
 export function QuizPlayer({ quiz, onComplete, onBack }: QuizPlayerProps) {
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [selectedAnswers, setSelectedAnswers] = useState<(number | null)[]>(
-    new Array(quiz.questions.length).fill(null)
-  );
+  const { quizState, updateQuizState, clearQuiz, initializeQuiz, isLoading, isCurrentQuiz } = useQuizPersistence();
   const [showResults, setShowResults] = useState(false);
-  const [startTime] = useState(Date.now());
   const [timeElapsed, setTimeElapsed] = useState(0);
   const [attempts, setAttempts] = useState<QuizAttempt[]>([]);
 
-  const currentQuestion = quiz.questions[currentQuestionIndex];
-  const progress = ((currentQuestionIndex + 1) / quiz.questions.length) * 100;
+  // Use persisted state or initialize new state
+  const currentQuestionIndex = quizState?.currentQuestionIndex || 0;
+  const selectedAnswers = quizState?.selectedAnswers || new Array(quiz.questions.length).fill(null);
+  const startTime = quizState?.startTime || Date.now();
+
+  // Validate and fix quiz state if needed
+  const validatedQuestionIndex = Math.min(currentQuestionIndex, quiz.questions.length - 1);
+  const validatedAnswers = selectedAnswers.length === quiz.questions.length 
+    ? selectedAnswers 
+    : new Array(quiz.questions.length).fill(null);
+
+  const currentQuestion = quiz.questions[validatedQuestionIndex];
+  const progress = ((validatedQuestionIndex + 1) / quiz.questions.length) * 100;
 
   const router = useRouter();
+
+  // Initialize quiz state only if no existing state and not loading
+  useEffect(() => {
+    if (!isLoading) {
+      if (!quizState && quiz) {
+        // No existing state, initialize new quiz
+        initializeQuiz(quiz);
+      } else if (quizState && !isCurrentQuiz(quiz)) {
+        // We have state for a different quiz, initialize current quiz
+        initializeQuiz(quiz);
+      }
+    }
+  }, [quiz, quizState, initializeQuiz, isLoading, isCurrentQuiz]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -50,27 +71,27 @@ export function QuizPlayer({ quiz, onComplete, onBack }: QuizPlayerProps) {
   }, []);
 
   const handleAnswerSelect = (answerIndex: number) => {
-    const newAnswers = [...selectedAnswers];
-    newAnswers[currentQuestionIndex] = answerIndex;
-    setSelectedAnswers(newAnswers);
+    const newAnswers = [...validatedAnswers];
+    newAnswers[validatedQuestionIndex] = answerIndex;
+    updateQuizState({ selectedAnswers: newAnswers });
   };
 
   const handleNext = () => {
-    if (currentQuestionIndex < quiz.questions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
+    if (validatedQuestionIndex < quiz.questions.length - 1) {
+      updateQuizState({ currentQuestionIndex: validatedQuestionIndex + 1 });
     } else {
       handleFinishQuiz();
     }
   };
 
   const handlePrevious = () => {
-    if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(currentQuestionIndex - 1);
+    if (validatedQuestionIndex > 0) {
+      updateQuizState({ currentQuestionIndex: validatedQuestionIndex - 1 });
     }
   };
 
   const handleFinishQuiz = async () => {
-    const score = selectedAnswers.reduce<number>((total: number, answer: number | null, index: number) => {
+    const score = validatedAnswers.reduce<number>((total: number, answer: number | null, index: number) => {
       if (answer === null) return total;
       return answer === quiz.questions[index].correct_answer ? total + 1 : total;
     }, 0);
@@ -82,7 +103,7 @@ export function QuizPlayer({ quiz, onComplete, onBack }: QuizPlayerProps) {
         quiz_id: quiz.id,
         score,
         total_questions: quiz.questions.length,
-        answers: selectedAnswers.map(a => a === null ? -1 : a),
+        answers: validatedAnswers.map(a => a === null ? -1 : a),
         time_taken: timeTaken,
         completed_at: new Date().toISOString()
       })
@@ -90,8 +111,10 @@ export function QuizPlayer({ quiz, onComplete, onBack }: QuizPlayerProps) {
       .single();
 
     if (data && !error) {
+      // Clear the persisted quiz state
+      clearQuiz();
       // Call onComplete with the attempt data
-      onComplete(score, selectedAnswers.map(a => a === null ? -1 : a), timeTaken, data.id);
+      onComplete(score, validatedAnswers.map(a => a === null ? -1 : a), timeTaken, data.id);
       router.push(`/review/${data.id}`);
     } else {
       alert('Failed to save attempt!');
@@ -104,8 +127,22 @@ export function QuizPlayer({ quiz, onComplete, onBack }: QuizPlayerProps) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Show loading state while persistence is initializing or if quiz doesn't match
+  if (isLoading || (!quizState && quiz) || (quizState && !isCurrentQuiz(quiz))) {
+    return (
+      <Card className="max-w-4xl mx-auto">
+        <CardContent className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading quiz...</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (showResults) {
-    const score = selectedAnswers.reduce<number>((total: number, answer: number | null, index: number) => {
+    const score = validatedAnswers.reduce<number>((total: number, answer: number | null, index: number) => {
       if (answer === null) return total;
       return answer === quiz.questions[index].correct_answer ? total + 1 : total;
     }, 0);
@@ -134,7 +171,7 @@ export function QuizPlayer({ quiz, onComplete, onBack }: QuizPlayerProps) {
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Question Review</h3>
             {quiz.questions.map((question, index) => {
-              const userAnswer = selectedAnswers[index];
+              const userAnswer = validatedAnswers[index];
               const isCorrect = userAnswer === question.correct_answer;
               
               return (
@@ -176,7 +213,10 @@ export function QuizPlayer({ quiz, onComplete, onBack }: QuizPlayerProps) {
           </div>
 
           <div className="flex gap-3 pt-4">
-            <Button onClick={onBack} variant="outline" className="flex-1">
+            <Button onClick={() => {
+              clearQuiz();
+              onBack();
+            }} variant="outline" className="flex-1">
               Back to Home
             </Button>
             <Button 
@@ -205,7 +245,7 @@ export function QuizPlayer({ quiz, onComplete, onBack }: QuizPlayerProps) {
               {formatTime(timeElapsed)}
             </Badge>
             <Badge variant="secondary">
-              {currentQuestionIndex + 1} of {quiz.questions.length}
+              {validatedQuestionIndex + 1} of {quiz.questions.length}
             </Badge>
           </div>
         </div>
@@ -222,9 +262,9 @@ export function QuizPlayer({ quiz, onComplete, onBack }: QuizPlayerProps) {
             {currentQuestion.options.map((option, index) => (
               <Button
                 key={index}
-                variant={selectedAnswers[currentQuestionIndex] === index ? "default" : "outline"}
+                variant={validatedAnswers[validatedQuestionIndex] === index ? "default" : "outline"}
                 className={`justify-start text-left h-auto p-4 transition-all ${
-                  selectedAnswers[currentQuestionIndex] === index
+                  validatedAnswers[validatedQuestionIndex] === index
                     ? 'bg-blue-600 hover:bg-blue-700 text-white'
                     : 'hover:bg-blue-50 hover:border-blue-200'
                 }`}
@@ -244,7 +284,7 @@ export function QuizPlayer({ quiz, onComplete, onBack }: QuizPlayerProps) {
         <div className="flex items-center justify-between pt-4 border-t">
           <Button
             onClick={handlePrevious}
-            disabled={currentQuestionIndex === 0}
+            disabled={validatedQuestionIndex === 0}
             variant="outline"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -253,10 +293,10 @@ export function QuizPlayer({ quiz, onComplete, onBack }: QuizPlayerProps) {
           
           <Button
             onClick={handleNext}
-            disabled={selectedAnswers[currentQuestionIndex] === null}
+            disabled={validatedAnswers[validatedQuestionIndex] === null}
             className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
           >
-            {currentQuestionIndex === quiz.questions.length - 1 ? 'Finish Quiz' : 'Next'}
+            {validatedQuestionIndex === quiz.questions.length - 1 ? 'Finish Quiz' : 'Next'}
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </div>
