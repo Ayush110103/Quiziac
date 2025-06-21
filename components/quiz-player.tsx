@@ -5,10 +5,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Clock, CheckCircle, XCircle, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, ArrowRight, ArrowLeft, Ban } from 'lucide-react';
 import { Quiz, Question, supabase, QuizAttempt } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { useQuizPersistence } from '@/hooks/use-quiz-persistence';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface QuizPlayerProps {
   quiz: Quiz;
@@ -334,125 +345,159 @@ export function QuizPlayer({ quiz, onComplete, onBack }: QuizPlayerProps) {
   }
 
   return (
-    <Card className="max-w-4xl mx-auto">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="text-xl">{quiz.title}</CardTitle>
-            <CardDescription>{quiz.topic}</CardDescription>
-          </div>
-          <div className="flex items-center gap-4">
-            <Badge variant="outline" className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              {formatTime(timeElapsed)}
-            </Badge>
-            <Badge variant="secondary">
-              {validatedQuestionIndex + 1} of {quiz.questions.length}
-            </Badge>
-          </div>
-        </div>
-        <Progress value={progress} className="mt-4" />
-        
-        {/* Time limit indicator */}
-        <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4" />
-            <span>Time Limit: {formatTime(quiz.questions.length * 2 * 60)}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span>Remaining: {formatTime(Math.max(0, (quiz.questions.length * 2 * 60) - timeElapsed))}</span>
-          </div>
-        </div>
-        
-        {/* Time progress bar */}
-        <div className="mt-2">
-          <div className="flex justify-between text-xs text-muted-foreground mb-1">
-            <span>Time Progress</span>
-            <span>{Math.round((timeElapsed / (quiz.questions.length * 2 * 60)) * 100)}%</span>
-          </div>
-          <Progress 
-            value={(timeElapsed / (quiz.questions.length * 2 * 60)) * 100} 
-            className={`h-2 ${
-              timeElapsed >= (quiz.questions.length * 2 * 60) * 0.8 
-                ? 'bg-red-100 dark:bg-red-900/20' 
-                : 'bg-blue-100 dark:bg-blue-900/20'
-            }`}
-          />
-        </div>
-        
-        {/* Time warning */}
-        {timeElapsed >= (quiz.questions.length * 2 * 60) * 0.8 && (
-          <div className={`mt-2 text-sm p-2 rounded ${
-            timeElapsed >= (quiz.questions.length * 2 * 60) * 0.95 
-              ? 'text-red-600 bg-red-50 dark:bg-red-900/20 animate-pulse' 
-              : 'text-orange-600 bg-orange-50 dark:bg-orange-900/20'
-          }`}>
-            ⏰ {timeElapsed >= (quiz.questions.length * 2 * 60) * 0.95 
-              ? 'Final warning: Quiz will auto-complete in less than 30 seconds!' 
-              : 'Warning: Time is running out! Complete your quiz soon.'}
-          </div>
-        )}
-      </CardHeader>
-      
-      <CardContent className="space-y-6">
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold leading-relaxed">
-            {currentQuestion.question}
-          </h2>
-          
-          <div className="grid gap-3">
-            {currentQuestion.options.map((option, index) => (
-              <Button
-                key={index}
-                variant={validatedAnswers[validatedQuestionIndex] === index ? "default" : "outline"}
-                className={`justify-start text-left h-auto p-4 transition-all ${
-                  validatedAnswers[validatedQuestionIndex] === index
-                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                    : 'hover:bg-blue-50 hover:border-blue-200'
-                }`}
-                onClick={() => handleAnswerSelect(index)}
-                disabled={isSubmitting}
+    <div>
+      <div className="fixed top-20 right-6 z-50">
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              variant="destructive"
+              disabled={isSubmitting}
+            >
+              <Ban className="mr-2 h-4 w-4" />
+              Cancel
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will end your current quiz attempt. Your progress will be saved,
+                and any unanswered questions will be marked as incorrect. You can review your results afterwards.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Go Back</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleFinishQuiz}
+                className="bg-red-600 hover:bg-red-700"
               >
-                <span className="flex items-center gap-3">
-                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-current/20 flex items-center justify-center text-sm font-medium">
-                    {String.fromCharCode(65 + index)}
-                  </span>
-                  {option}
-                </span>
-              </Button>
-            ))}
-          </div>
-        </div>
+                Yes, Cancel Quiz
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
 
-        <div className="flex items-center justify-between pt-4 border-t">
-          <Button
-            onClick={handlePrevious}
-            disabled={validatedQuestionIndex === 0 || isSubmitting}
-            variant="outline"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Previous
-          </Button>
+      <Card className="max-w-4xl mx-auto">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-xl">{quiz.title}</CardTitle>
+              <CardDescription>{quiz.topic}</CardDescription>
+            </div>
+            <div className="flex items-center gap-4">
+              <Badge variant="outline" className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {formatTime(timeElapsed)}
+              </Badge>
+              <Badge variant="secondary">
+                {validatedQuestionIndex + 1} of {quiz.questions.length}
+              </Badge>
+            </div>
+          </div>
+          <Progress value={progress} className="mt-4" />
           
-          <Button
-            onClick={handleNext}
-            disabled={validatedAnswers[validatedQuestionIndex] === null || isSubmitting}
-            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-          >
-            {isSubmitting ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Submitting...
-              </>
-            ) : (
-              <>
-                {validatedQuestionIndex === quiz.questions.length - 1 ? 'Finish Quiz' : 'Next'}
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </>
-            )}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+          {/* Time limit indicator */}
+          <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              <span>Time Limit: {formatTime(quiz.questions.length * 2 * 60)}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span>Remaining: {formatTime(Math.max(0, (quiz.questions.length * 2 * 60) - timeElapsed))}</span>
+            </div>
+          </div>
+          
+          {/* Time progress bar */}
+          <div className="mt-2">
+            <div className="flex justify-between text-xs text-muted-foreground mb-1">
+              <span>Time Progress</span>
+              <span>{Math.round((timeElapsed / (quiz.questions.length * 2 * 60)) * 100)}%</span>
+            </div>
+            <Progress 
+              value={(timeElapsed / (quiz.questions.length * 2 * 60)) * 100} 
+              className={`h-2 ${
+                timeElapsed >= (quiz.questions.length * 2 * 60) * 0.8 
+                  ? 'bg-red-100 dark:bg-red-900/20' 
+                  : 'bg-blue-100 dark:bg-blue-900/20'
+              }`}
+            />
+          </div>
+          
+          {/* Time warning */}
+          {timeElapsed >= (quiz.questions.length * 2 * 60) * 0.8 && (
+            <div className={`mt-2 text-sm p-2 rounded ${
+              timeElapsed >= (quiz.questions.length * 2 * 60) * 0.95 
+                ? 'text-red-600 bg-red-50 dark:bg-red-900/20 animate-pulse' 
+                : 'text-orange-600 bg-orange-50 dark:bg-orange-900/20'
+            }`}>
+              ⏰ {timeElapsed >= (quiz.questions.length * 2 * 60) * 0.95 
+                ? 'Final warning: Quiz will auto-complete in less than 30 seconds!' 
+                : 'Warning: Time is running out! Complete your quiz soon.'}
+            </div>
+          )}
+        </CardHeader>
+        
+        <CardContent className="space-y-6">
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold leading-relaxed">
+              {currentQuestion.question}
+            </h2>
+            
+            <div className="grid gap-3">
+              {currentQuestion.options.map((option, index) => (
+                <Button
+                  key={index}
+                  variant={validatedAnswers[validatedQuestionIndex] === index ? "default" : "outline"}
+                  className={`justify-start text-left h-auto p-4 transition-all ${
+                    validatedAnswers[validatedQuestionIndex] === index
+                      ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                      : 'hover:bg-blue-50 hover:border-blue-200'
+                  }`}
+                  onClick={() => handleAnswerSelect(index)}
+                  disabled={isSubmitting}
+                >
+                  <span className="flex items-center gap-3">
+                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-current/20 flex items-center justify-center text-sm font-medium">
+                      {String.fromCharCode(65 + index)}
+                    </span>
+                    {option}
+                  </span>
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-4 border-t">
+            <Button
+              onClick={handlePrevious}
+              disabled={validatedQuestionIndex === 0 || isSubmitting}
+              variant="outline"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Previous
+            </Button>
+            
+            <Button
+              onClick={handleNext}
+              disabled={validatedAnswers[validatedQuestionIndex] === null || isSubmitting}
+              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+            >
+              {isSubmitting ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Submitting...
+                </>
+              ) : (
+                <>
+                  {validatedQuestionIndex === quiz.questions.length - 1 ? 'Finish Quiz' : 'Next'}
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </>
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
