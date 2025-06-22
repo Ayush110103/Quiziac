@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Quiziac Logo](https://img.shields.io/badge/Quiziac-AI%20Learning%20Platform-blue?style=for-the-badge&logo=react)
+
 ![Next.js](https://img.shields.io/badge/Next.js-14.1.0-black?style=for-the-badge&logo=next.js)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.3.3-blue?style=for-the-badge&logo=typescript)
 ![Supabase](https://img.shields.io/badge/Supabase-Database-green?style=for-the-badge&logo=supabase)
@@ -12,7 +12,11 @@
 
 [🚀 Live Demo](https://quiziac11.vercel.app/) • [📖 Documentation](#features) • [🛠️ Tech Stack](#technical-architecture)
 
-</div>
+![1750609995830](image/README/1750609995830.png)
+
+![1750610024586](image/README/1750610024586.png)
+
+![1750610088797](image/README/1750610088797.png) ![1750610142146](image/README/1750610142146.png)
 
 ---
 
