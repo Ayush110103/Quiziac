@@ -12,10 +12,14 @@ import { createClient } from '@/lib/supabase-client';
 import { MainLayout } from '@/components/layout/main-layout';
 import { useQuizPersistence } from '@/hooks/use-quiz-persistence';
 
+type QuizWithLastAttempt = Quiz & {
+  last_attempt_completed_at?: string;
+};
+
 export default function Home() {
   const supabase = createClient();
   const [currentView, setCurrentView] = useState<'home' | 'create' | 'play'>('home');
-  const [recentQuizzes, setRecentQuizzes] = useState<Quiz[]>([]);
+  const [recentQuizzes, setRecentQuizzes] = useState<QuizWithLastAttempt[]>([]);
   const [stats, setStats] = useState({
     totalQuizzes: 0,
     totalAttempts: 0,
@@ -44,7 +48,23 @@ export default function Home() {
       .limit(6);
     
     if (quizzes) {
-      setRecentQuizzes(quizzes);
+      const quizzesWithAttempts = await Promise.all(
+        quizzes.map(async (quiz) => {
+          const { data: lastAttempt, error } = await supabase
+            .from('quiz_attempts')
+            .select('completed_at')
+            .eq('quiz_id', quiz.id)
+            .order('completed_at', { ascending: false })
+            .limit(1)
+            .single();
+
+          return {
+            ...quiz,
+            last_attempt_completed_at: lastAttempt?.completed_at,
+          };
+        })
+      );
+      setRecentQuizzes(quizzesWithAttempts);
     }
   };
 
@@ -218,6 +238,7 @@ export default function Home() {
                 key={quiz.id}
                 quiz={quiz}
                 onStart={handleStartQuiz}
+                lastAttemptTime={quiz.last_attempt_completed_at}
               />
             ))}
           </div>

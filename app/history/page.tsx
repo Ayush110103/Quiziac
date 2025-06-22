@@ -4,7 +4,7 @@ import { MainLayout } from '@/components/layout/main-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { QuizCard } from '@/components/quiz-card';
-import { Quiz } from '@/lib/supabase';
+import { Quiz, QuizAttempt } from '@/lib/supabase';
 import { createClient } from '@/lib/supabase-client';
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Search, Filter } from 'lucide-react';
@@ -15,8 +15,8 @@ import { useQuizPersistence } from '@/hooks/use-quiz-persistence';
 import { useRouter } from 'next/navigation';
 
 export default function HistoryPage() {
-  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
-  const [filteredQuizzes, setFilteredQuizzes] = useState<Quiz[]>([]);
+  const [attempts, setAttempts] = useState<QuizAttempt[]>([]);
+  const [filteredAttempts, setFilteredAttempts] = useState<QuizAttempt[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [difficultyFilter, setDifficultyFilter] = useState('all');
   const [sortBy, setSortBy] = useState('recent');
@@ -31,21 +31,23 @@ export default function HistoryPage() {
 
   useEffect(() => {
     filterAndSortQuizzes();
-  }, [quizzes, searchTerm, difficultyFilter, sortBy]);
+  }, [attempts, searchTerm, difficultyFilter, sortBy]);
 
   const loadQuizzes = async () => {
     const { data } = await supabase
-      .from('quizzes')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .from('quiz_attempts')
+      .select('*, quiz:quizzes(*)')
+      .order('completed_at', { ascending: false });
     
     if (data) {
-      setQuizzes(data as Quiz[]);
+      setAttempts(data as QuizAttempt[]);
     }
   };
 
   const filterAndSortQuizzes = () => {
-    let filtered = quizzes.filter(quiz => {
+    let filtered = attempts.filter(attempt => {
+      if (!attempt.quiz) return false;
+      const quiz = attempt.quiz as Quiz;
       const matchesSearch = quiz.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            quiz.topic.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesDifficulty = difficultyFilter === 'all' || quiz.difficulty === difficultyFilter;
@@ -54,21 +56,24 @@ export default function HistoryPage() {
     });
 
     filtered.sort((a, b) => {
+      const quizA = a.quiz as Quiz;
+      const quizB = b.quiz as Quiz;
+
       switch (sortBy) {
         case 'recent':
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+          return new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime();
         case 'title':
-          return a.title.localeCompare(b.title);
+          return quizA.title.localeCompare(quizB.title);
         case 'difficulty':
           const difficultyOrder = { easy: 1, medium: 2, hard: 3 };
-          return difficultyOrder[a.difficulty as keyof typeof difficultyOrder] - 
-                 difficultyOrder[b.difficulty as keyof typeof difficultyOrder];
+          return difficultyOrder[quizA.difficulty as keyof typeof difficultyOrder] - 
+                 difficultyOrder[quizB.difficulty as keyof typeof difficultyOrder];
         default:
           return 0;
       }
     });
 
-    setFilteredQuizzes(filtered);
+    setFilteredAttempts(filtered);
   };
 
   const handleStartQuiz = (quiz: Quiz) => {
@@ -172,15 +177,20 @@ export default function HistoryPage() {
         </CardContent>
       </Card>
 
-      {filteredQuizzes.length > 0 ? (
+      {filteredAttempts.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredQuizzes.map((quiz) => (
-            <QuizCard
-              key={quiz.id}
-              quiz={quiz}
-              onStart={handleStartQuiz}
-            />
-          ))}
+          {filteredAttempts.map((attempt) => {
+            if (!attempt.quiz) return null;
+            const quiz = attempt.quiz as Quiz;
+            return (
+              <QuizCard
+                key={attempt.id}
+                quiz={quiz}
+                onStart={handleStartQuiz}
+                lastAttemptTime={attempt.completed_at}
+              />
+            );
+          })}
         </div>
       ) : (
         <Card className="text-center py-12">
@@ -188,7 +198,7 @@ export default function HistoryPage() {
             <p className="text-muted-foreground">
               {searchTerm || difficultyFilter !== 'all' 
                 ? 'No quizzes match your search criteria'
-                : 'No quizzes found in history.'}
+                : 'You have not attempted any quizzes yet.'}
             </p>
           </CardContent>
         </Card>
