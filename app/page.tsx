@@ -7,23 +7,38 @@ import { QuizCreator } from '@/components/quiz-creator';
 import { QuizPlayer } from '@/components/quiz-player';
 import { QuizCard } from '@/components/quiz-card';
 import { Brain, History, TrendingUp, Users, Sparkles, BookOpen } from 'lucide-react';
-import { Quiz, supabase } from '@/lib/supabase';
+import { Quiz } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase-client';
 import { MainLayout } from '@/components/layout/main-layout';
+import { useQuizPersistence } from '@/hooks/use-quiz-persistence';
+
+type QuizWithLastAttempt = Quiz & {
+  last_attempt_completed_at?: string;
+};
 
 export default function Home() {
+  const supabase = createClient();
   const [currentView, setCurrentView] = useState<'home' | 'create' | 'play'>('home');
-  const [currentQuiz, setCurrentQuiz] = useState<Quiz | null>(null);
-  const [recentQuizzes, setRecentQuizzes] = useState<Quiz[]>([]);
+  const [recentQuizzes, setRecentQuizzes] = useState<QuizWithLastAttempt[]>([]);
   const [stats, setStats] = useState({
     totalQuizzes: 0,
     totalAttempts: 0,
     averageScore: 0
   });
 
+  const { quizState, startQuiz, clearQuiz, isLoading } = useQuizPersistence();
+
   useEffect(() => {
     loadRecentQuizzes();
     loadStats();
   }, []);
+
+  // Check if there's an active quiz and show it
+  useEffect(() => {
+    if (quizState && !isLoading) {
+      setCurrentView('play');
+    }
+  }, [quizState, isLoading]);
 
   const loadRecentQuizzes = async () => {
     const { data: quizzes } = await supabase
@@ -33,7 +48,23 @@ export default function Home() {
       .limit(6);
     
     if (quizzes) {
-      setRecentQuizzes(quizzes);
+      const quizzesWithAttempts = await Promise.all(
+        quizzes.map(async (quiz) => {
+          const { data: lastAttempt, error } = await supabase
+            .from('quiz_attempts')
+            .select('completed_at')
+            .eq('quiz_id', quiz.id)
+            .order('completed_at', { ascending: false })
+            .limit(1)
+            .single();
+
+          return {
+            ...quiz,
+            last_attempt_completed_at: lastAttempt?.completed_at,
+          };
+        })
+      );
+      setRecentQuizzes(quizzesWithAttempts);
     }
   };
 
@@ -42,32 +73,40 @@ export default function Home() {
     const { data: attempts } = await supabase.from('quiz_attempts').select('score, total_questions');
     
     if (quizzes && attempts) {
-      const totalScore = attempts.reduce((sum, attempt) => sum + attempt.score, 0);
-      const totalPossible = attempts.reduce((sum, attempt) => sum + attempt.total_questions, 0);
+      // Calculate average score as percentage
+      const totalPercentage = attempts.reduce((sum, attempt) => {
+        const percentage = (attempt.score / attempt.total_questions) * 100;
+        return sum + percentage;
+      }, 0);
       
       setStats({
         totalQuizzes: quizzes.length,
         totalAttempts: attempts.length,
-        averageScore: totalPossible > 0 ? Math.round((totalScore / totalPossible) * 100) : 0
+        averageScore: attempts.length > 0 ? Math.round(totalPercentage / attempts.length) : 0
       });
     }
   };
 
   const handleQuizCreated = (quiz: Quiz) => {
-    setCurrentQuiz(quiz);
+    startQuiz(quiz);
     setCurrentView('play');
     loadRecentQuizzes();
   };
 
   const handleQuizComplete = () => {
     setCurrentView('home');
-    setCurrentQuiz(null);
+    clearQuiz();
     loadStats();
   };
 
   const handleStartQuiz = (quiz: Quiz) => {
-    setCurrentQuiz(quiz);
+    startQuiz(quiz);
     setCurrentView('play');
+  };
+
+  const handleBackToHome = () => {
+    setCurrentView('home');
+    clearQuiz();
   };
 
   if (currentView === 'create') {
@@ -87,14 +126,28 @@ export default function Home() {
     );
   }
 
-  if (currentView === 'play' && currentQuiz) {
+  if (currentView === 'play' && quizState) {
     return (
       <MainLayout>
         <QuizPlayer 
-          quiz={currentQuiz} 
+          quiz={quizState.quiz} 
           onComplete={handleQuizComplete}
-          onBack={() => setCurrentView('home')}
+          onBack={handleBackToHome}
         />
+      </MainLayout>
+    );
+  }
+
+  // Show loading state while checking for persisted quiz
+  if (isLoading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading...</p>
+          </div>
+        </div>
       </MainLayout>
     );
   }
@@ -185,6 +238,7 @@ export default function Home() {
                 key={quiz.id}
                 quiz={quiz}
                 onStart={handleStartQuiz}
+                lastAttemptTime={quiz.last_attempt_completed_at}
               />
             ))}
           </div>

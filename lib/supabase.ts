@@ -12,7 +12,7 @@ export const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   {
     auth: {
-      persistSession: false
+      persistSession: true
     }
   }
 );
@@ -28,6 +28,7 @@ supabase.from('quizzes').select('count').single()
 
 export type Quiz = {
   id: string;
+  user_id: string;
   title: string;
   topic: string;
   difficulty: string;
@@ -44,10 +45,11 @@ export type Question = {
 
 export type QuizAttempt = {
   id: string;
+  user_id: string;
   quiz_id: string;
   score: number;
   total_questions: number;
-  answers: number[];
+  answers: (number | null)[];
   time_taken: number;
   completed_at: string;
   quiz?: Quiz;

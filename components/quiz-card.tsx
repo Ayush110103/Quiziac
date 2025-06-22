@@ -16,31 +16,20 @@ interface QuizCardProps {
   averageScore?: number;
   attempts?: number;
   latestAttemptId?: string;
+  lastAttemptTime?: string | null;
 }
 
-export function QuizCard({ quiz, onStart, showStats, averageScore, attempts, latestAttemptId }: QuizCardProps) {
+export function QuizCard({ 
+  quiz, 
+  onStart, 
+  showStats, 
+  averageScore, 
+  attempts, 
+  latestAttemptId,
+  lastAttemptTime,
+}: QuizCardProps) {
   const router = useRouter();
-  const [localAttempts, setLocalAttempts] = useState<QuizAttempt[]>([]);
   const [currentQuiz, setCurrentQuiz] = useState<Quiz | null>(null);
-  const [lastAttemptTime, setLastAttemptTime] = useState<string | null>(null);
-
-  useEffect(() => {
-    const loadAttempts = async () => {
-      const { data } = await supabase
-        .from('quiz_attempts')
-        .select('*')
-        .eq('quiz_id', quiz.id)
-        .order('completed_at', { ascending: false })
-        .limit(1);
-      
-      if (data && data.length > 0) {
-        const lastAttempt = data[0];
-        const date = new Date(lastAttempt.completed_at);
-        setLastAttemptTime(date.toLocaleDateString() + ' ' + date.toLocaleTimeString());
-      }
-    };
-    loadAttempts();
-  }, [quiz.id]);
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty.toLowerCase()) {
@@ -127,7 +116,10 @@ export function QuizCard({ quiz, onStart, showStats, averageScore, attempts, lat
           {lastAttemptTime && (
             <div className="flex items-center gap-1 text-sm text-muted-foreground">
               <History className="h-4 w-4" />
-              <span>Last attempt: {lastAttemptTime}</span>
+              <span>
+                Last attempt: {new Date(lastAttemptTime).toLocaleDateString()}{' '}
+                {new Date(lastAttemptTime).toLocaleTimeString()}
+              </span>
             </div>
           )}
           

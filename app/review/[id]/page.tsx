@@ -8,13 +8,15 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ChatInterface from '@/components/chat-interface';
 import { ArrowLeft, Brain, MessageCircle, BookOpen, Lightbulb, TrendingUp } from 'lucide-react';
-import { Quiz, QuizAttempt, supabase } from '@/lib/supabase';
+import { Quiz, QuizAttempt } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase-client';
 import { MainLayout } from '@/components/layout/main-layout';
 
 export default function ReviewPage() {
   const params = useParams();
   const quizId = params.id as string;
   const router = useRouter();
+  const supabase = createClient();
   
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [attempts, setAttempts] = useState<QuizAttempt[]>([]);
@@ -87,21 +89,29 @@ export default function ReviewPage() {
         const { data: quizData, error: quizError } = await supabase
           .from('quizzes')
           .select('*')
-          .eq('id', attemptData.quiz_id)
+          .eq('id', (attemptData as QuizAttempt).quiz_id)
           .single();
 
         if (quizData && !quizError) {
-          setQuiz(quizData);
+          setQuiz(quizData as Quiz);
           
           // Fetch attempts for the quiz
           const { data: attemptsData } = await supabase
             .from('quiz_attempts')
             .select('*')
-            .eq('quiz_id', quizData.id)
+            .eq('quiz_id', (quizData as Quiz).id)
             .order('completed_at', { ascending: false });
 
           if (attemptsData) {
-            setAttempts(attemptsData);
+            const typedAttempts = attemptsData as QuizAttempt[];
+            console.log('Loaded attempts data:', typedAttempts);
+            console.log('Attempts with scores:', typedAttempts.map(a => ({
+              id: a.id,
+              score: a.score,
+              total_questions: a.total_questions,
+              percentage: Math.round((a.score / a.total_questions) * 100)
+            })));
+            setAttempts(typedAttempts);
           }
           return;
         }
@@ -115,17 +125,18 @@ export default function ReviewPage() {
         .single();
 
       if (quizData && !quizError) {
-        setQuiz(quizData);
+        setQuiz(quizData as Quiz);
         
         // Fetch attempts for the quiz
         const { data: attemptsData } = await supabase
           .from('quiz_attempts')
           .select('*')
-          .eq('quiz_id', quizData.id)
+          .eq('quiz_id', (quizData as Quiz).id)
           .order('completed_at', { ascending: false });
 
         if (attemptsData) {
-          setAttempts(attemptsData);
+          console.log('Loaded attempts data (direct quiz):', attemptsData);
+          setAttempts(attemptsData as QuizAttempt[]);
         }
       } else {
         // Handle case where neither attempt nor quiz is found
@@ -192,15 +203,41 @@ export default function ReviewPage() {
   }
 
   const bestAttempt = attempts.length > 0 
-    ? attempts.reduce((best, current) => 
-        (current.score / current.total_questions) > (best.score / best.total_questions) ? current : best
-      )
+    ? attempts.reduce((best, current) => {
+        const currentPercentage = (current.score / current.total_questions) * 100;
+        const bestPercentage = (best.score / best.total_questions) * 100;
+        return currentPercentage > bestPercentage ? current : best;
+      })
     : null;
 
+  const lastAttempt = attempts.length > 0 ? attempts[0] : null;
+
   const averageScore = attempts.length > 0
-    ? Math.round(attempts.reduce((sum, attempt) => 
-        sum + (attempt.score / attempt.total_questions) * 100, 0) / attempts.length)
+    ? Math.round(attempts.reduce((sum, attempt) => {
+        const percentage = (attempt.score / attempt.total_questions) * 100;
+        return sum + percentage;
+      }, 0) / attempts.length)
     : 0;
+
+  // Debug logging for score calculations
+  if (attempts.length > 0) {
+    console.log('Score calculations:', {
+      attemptsCount: attempts.length,
+      attempts: attempts.map(a => ({
+        id: a.id,
+        score: a.score,
+        total_questions: a.total_questions,
+        percentage: Math.round((a.score / a.total_questions) * 100)
+      })),
+      bestAttempt: bestAttempt ? {
+        id: bestAttempt.id,
+        score: bestAttempt.score,
+        total_questions: bestAttempt.total_questions,
+        percentage: Math.round((bestAttempt.score / bestAttempt.total_questions) * 100)
+      } : null,
+      averageScore
+    });
+  }
 
   return (
     <MainLayout>
@@ -238,7 +275,7 @@ export default function ReviewPage() {
                   </div>
                   <div className="text-center p-4 bg-purple-50 dark:bg-purple-900 rounded-lg">
                     <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                      {bestAttempt ? Math.round((bestAttempt.score / bestAttempt.total_questions) * 100) : 0}%
+                      {bestAttempt ? Math.round(bestAttempt.score / bestAttempt.total_questions * 100) : 0}%
                     </div>
                     <div className="text-sm text-muted-foreground">Best Score</div>
                   </div>
@@ -261,39 +298,65 @@ export default function ReviewPage() {
                     <CardDescription className="dark:text-muted-foreground">Review all questions from this quiz</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    {quiz.questions.map((question, index) => (
-                      <div key={index} className="border-l-4 border-l-blue-200 dark:border-l-blue-700 pl-4 space-y-3">
-                        <h4 className="font-medium text-lg dark:text-white">{question.question}</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                          {question.options.map((option, optionIndex) => (
-                            <div
-                              key={optionIndex}
-                              className={`p-3 rounded border ${
-                                optionIndex === question.correct_answer
-                                  ? 'bg-green-50 border-green-200 text-green-800 dark:bg-green-900 dark:border-green-700 dark:text-green-300'
-                                  : 'bg-gray-50 border-gray-200 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200'
-                              }`}
-                            >
-                              <span className="font-medium mr-2">
-                                {String.fromCharCode(65 + optionIndex)}.
-                              </span>
-                              {option}
-                              {optionIndex === question.correct_answer && (
-                                <span className="ml-2 text-green-600 dark:text-green-400">✓ Correct</span>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                        {question.explanation && (
-                          <div className="bg-blue-50 p-3 rounded border border-blue-200 dark:bg-blue-900 dark:border-blue-700">
-                            <p className="text-sm dark:text-blue-300">
-                              <Lightbulb className="inline h-4 w-4 mr-1 text-blue-600 dark:text-blue-400" />
-                              <strong>Explanation:</strong> {question.explanation}
-                            </p>
+                    {quiz.questions.map((question, index) => {
+                      const userAnswer = lastAttempt ? (lastAttempt.answers as (number | null)[])[index] : null;
+                      const isAttempted = userAnswer !== null;
+                      const isCorrect = isAttempted && userAnswer === question.correct_answer;
+
+                      const questionBorderStyle = isAttempted
+                        ? isCorrect
+                          ? 'border-l-green-400 dark:border-l-green-600'
+                          : 'border-l-purple-400 dark:border-l-purple-600'
+                        : 'border-l-gray-300 dark:border-l-gray-600';
+
+                      return (
+                        <div key={index} className={`border-l-4 ${questionBorderStyle} pl-4 space-y-3`}>
+                          <h4 className="font-medium text-lg dark:text-white">{question.question}</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            {question.options.map((option, optionIndex) => {
+                              const isCorrectAnswer = optionIndex === question.correct_answer;
+                              const isUserChoice = isAttempted && optionIndex === userAnswer;
+                              
+                              return (
+                                <div
+                                  key={optionIndex}
+                                  className={`p-3 rounded border ${
+                                    isCorrectAnswer
+                                      ? 'bg-green-50 border-green-200 text-green-800 dark:bg-green-900 dark:border-green-700 dark:text-green-300'
+                                      : isUserChoice
+                                      ? 'bg-purple-50 border-purple-200 text-purple-800 dark:bg-purple-900 dark:border-purple-700 dark:text-purple-300'
+                                      : 'bg-gray-50 border-gray-200 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200'
+                                  }`}
+                                >
+                                  <span className="font-medium mr-2">
+                                    {String.fromCharCode(65 + optionIndex)}.
+                                  </span>
+                                  {option}
+                                  
+                                  {isUserChoice && isCorrectAnswer && (
+                                    <span className="ml-2 text-green-600 dark:text-green-400 font-semibold">✓ Your Answer</span>
+                                  )}
+                                  {isUserChoice && !isCorrectAnswer && (
+                                    <span className="ml-2 text-purple-600 dark:text-purple-400 font-semibold">✗ Your Answer</span>
+                                  )}
+                                  {isCorrectAnswer && !isUserChoice && (
+                                    <span className="ml-2 text-green-600 dark:text-green-400">✓ Correct</span>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
-                        )}
-                      </div>
-                    ))}
+                          {question.explanation && (
+                            <div className="bg-blue-50 p-3 rounded border border-blue-200 dark:bg-blue-900 dark:border-blue-700">
+                              <p className="text-sm dark:text-blue-300">
+                                <Lightbulb className="inline h-4 w-4 mr-1 text-blue-600 dark:text-blue-400" />
+                                <strong>Explanation:</strong> {question.explanation}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </CardContent>
                 </Card>
               </TabsContent>
