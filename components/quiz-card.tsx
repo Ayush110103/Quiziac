@@ -2,11 +2,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Clock, BookOpen, BarChart3, History } from 'lucide-react';
-import { Quiz } from '@/lib/supabase';
+import { Quiz } from '@/lib/neon';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
-import { QuizAttempt } from '@/lib/supabase';
+import { QuizAttempt } from '@/lib/neon';
 import { QuizPlayer } from '@/components/quiz-player';
 
 interface QuizCardProps {
