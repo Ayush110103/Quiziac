@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,26 +10,40 @@ import Link from 'next/link';
 export default function SignupPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
   const [message, setMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-  const supabase = createClient();
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage('');
+    setIsLoading(true);
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${location.origin}/auth/callback`,
-      },
-    });
+    try {
+      const response = await fetch('/api/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password, name }),
+      });
 
-    if (error) {
-      setMessage(error.message);
-    } else {
-      setMessage('Check your email to continue the sign-up process.');
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessage(data.error || 'An error occurred during signup');
+      } else {
+        setMessage('Account created successfully! You can now login.');
+        // Clear the form
+        setEmail('');
+        setPassword('');
+        setName('');
+      }
+    } catch (error) {
+      setMessage('An error occurred during signup');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -46,6 +59,17 @@ export default function SignupPage() {
           </div>
           <form onSubmit={handleSignup} className="grid gap-4">
             <div className="grid gap-2">
+              <Label htmlFor="name">Name (Optional)</Label>
+              <Input
+                id="name"
+                type="text"
+                placeholder="John Doe"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                disabled={isLoading}
+              />
+            </div>
+            <div className="grid gap-2">
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
@@ -54,6 +78,7 @@ export default function SignupPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                disabled={isLoading}
               />
             </div>
             <div className="grid gap-2">
@@ -64,11 +89,18 @@ export default function SignupPage() {
                 required 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
               />
             </div>
-            {message && <p className="text-green-500 text-sm text-center">{message}</p>}
-            <Button type="submit" className="w-full">
-              Create an account
+            {message && (
+              <p className={`text-sm text-center ${
+                message.includes('successfully') ? 'text-green-500' : 'text-red-500'
+              }`}>
+                {message}
+              </p>
+            )}
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? 'Creating account...' : 'Create an account'}
             </Button>
           </form>
           <div className="mt-4 text-center text-sm">

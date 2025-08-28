@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { Loader2, Sparkles, Brain } from 'lucide-react';
-import { Quiz } from '@/lib/supabase';
+import { Quiz } from '@/lib/neon';
 
 interface QuizCreatorProps {
   onQuizCreated: (quiz: Quiz) => void;

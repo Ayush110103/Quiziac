@@ -8,15 +8,15 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ChatInterface from '@/components/chat-interface';
 import { ArrowLeft, Brain, MessageCircle, BookOpen, Lightbulb, TrendingUp } from 'lucide-react';
-import { Quiz, QuizAttempt } from '@/lib/supabase';
-import { createClient } from '@/lib/supabase-client';
+import { Quiz, QuizAttempt } from '@/lib/neon';
+import { useSession } from 'next-auth/react';
 import { MainLayout } from '@/components/layout/main-layout';
 
 export default function ReviewPage() {
   const params = useParams();
   const quizId = params.id as string;
   const router = useRouter();
-  const supabase = createClient();
+  const { data: session } = useSession();
   
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [attempts, setAttempts] = useState<QuizAttempt[]>([]);
@@ -69,77 +69,49 @@ export default function ReviewPage() {
   }, []);
 
   useEffect(() => {
-    if (quizId) {
+    if (quizId && session) {
       loadQuizData();
       generateRelatedTopics();
     }
-  }, [quizId]);
+  }, [quizId, session]);
 
   const loadQuizData = async () => {
     try {
-      // First try to fetch the attempt
-      const { data: attemptData, error: attemptError } = await supabase
-        .from('quiz_attempts')
-        .select('quiz_id')
-        .eq('id', quizId)
-        .single();
-
-      if (attemptData && !attemptError) {
-        // If attempt found, fetch the quiz
-        const { data: quizData, error: quizError } = await supabase
-          .from('quizzes')
-          .select('*')
-          .eq('id', (attemptData as QuizAttempt).quiz_id)
-          .single();
-
-        if (quizData && !quizError) {
-          setQuiz(quizData as Quiz);
+      // Fetch quiz attempts to find the quiz
+      const response = await fetch('/api/quiz-attempts');
+      if (!response.ok) {
+        throw new Error('Failed to fetch quiz attempts');
+      }
+      
+      const allAttempts: QuizAttempt[] = await response.json();
+      
+      // Find the attempt with this ID
+      const targetAttempt = allAttempts.find(attempt => attempt.id === quizId);
+      
+      if (targetAttempt) {
+        // If we found an attempt, fetch the quiz data
+        const quizResponse = await fetch(`/api/quizzes/${targetAttempt.quiz_id}`);
+        if (quizResponse.ok) {
+          const quizData: Quiz = await quizResponse.json();
+          setQuiz(quizData);
           
-          // Fetch attempts for the quiz
-          const { data: attemptsData } = await supabase
-            .from('quiz_attempts')
-            .select('*')
-            .eq('quiz_id', (quizData as Quiz).id)
-            .order('completed_at', { ascending: false });
-
-          if (attemptsData) {
-            const typedAttempts = attemptsData as QuizAttempt[];
-            console.log('Loaded attempts data:', typedAttempts);
-            console.log('Attempts with scores:', typedAttempts.map(a => ({
-              id: a.id,
-              score: a.score,
-              total_questions: a.total_questions,
-              percentage: Math.round((a.score / a.total_questions) * 100)
-            })));
-            setAttempts(typedAttempts);
-          }
+          // Get all attempts for this quiz
+          const quizAttempts = allAttempts.filter(attempt => attempt.quiz_id === targetAttempt.quiz_id);
+          setAttempts(quizAttempts);
           return;
         }
       }
-
-      // If attempt not found, try to fetch the quiz directly
-      const { data: quizData, error: quizError } = await supabase
-        .from('quizzes')
-        .select('*')
-        .eq('id', quizId)
-        .single();
-
-      if (quizData && !quizError) {
-        setQuiz(quizData as Quiz);
+      
+      // If no attempt found, try to fetch quiz directly
+      const quizResponse = await fetch(`/api/quizzes/${quizId}`);
+      if (quizResponse.ok) {
+        const quizData: Quiz = await quizResponse.json();
+        setQuiz(quizData);
         
-        // Fetch attempts for the quiz
-        const { data: attemptsData } = await supabase
-          .from('quiz_attempts')
-          .select('*')
-          .eq('quiz_id', (quizData as Quiz).id)
-          .order('completed_at', { ascending: false });
-
-        if (attemptsData) {
-          console.log('Loaded attempts data (direct quiz):', attemptsData);
-          setAttempts(attemptsData as QuizAttempt[]);
-        }
+        // Get attempts for this quiz
+        const quizAttempts = allAttempts.filter(attempt => attempt.quiz_id === quizId);
+        setAttempts(quizAttempts);
       } else {
-        // Handle case where neither attempt nor quiz is found
         console.error('Quiz not found');
         router.push('/history');
       }
@@ -188,6 +160,19 @@ export default function ReviewPage() {
       setLoadingExplanation(false);
     }
   };
+
+  if (!session) {
+    return (
+      <MainLayout>
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center">
+          <div className="text-center">
+            <Brain className="h-12 w-12 text-blue-600 dark:text-blue-400 mx-auto mb-4 animate-pulse" />
+            <p className="text-muted-foreground">Please log in to view this page.</p>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
 
   if (!quiz) {
     return (
