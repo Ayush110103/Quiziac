@@ -4,8 +4,7 @@ import { MainLayout } from '@/components/layout/main-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { QuizCard } from '@/components/quiz-card';
-import { Quiz, QuizAttempt } from '@/lib/supabase';
-import { createClient } from '@/lib/supabase-client';
+import { Quiz, QuizAttempt } from '@/lib/neon';
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Search, Filter } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -13,8 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { QuizPlayer } from '@/components/quiz-player';
 import { useQuizPersistence } from '@/hooks/use-quiz-persistence';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 
 export default function HistoryPage() {
+  const { data: session } = useSession();
   const [attempts, setAttempts] = useState<QuizAttempt[]>([]);
   const [filteredAttempts, setFilteredAttempts] = useState<QuizAttempt[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -22,25 +23,29 @@ export default function HistoryPage() {
   const [sortBy, setSortBy] = useState('recent');
 
   const { quizState, startQuiz, clearQuiz, isLoading } = useQuizPersistence();
-  const supabase = createClient();
   const router = useRouter();
 
   useEffect(() => {
-    loadQuizzes();
-  }, []);
+    if (session?.user?.id) {
+      loadQuizzes();
+    }
+  }, [session?.user?.id]);
 
   useEffect(() => {
     filterAndSortQuizzes();
   }, [attempts, searchTerm, difficultyFilter, sortBy]);
 
   const loadQuizzes = async () => {
-    const { data } = await supabase
-      .from('quiz_attempts')
-      .select('*, quiz:quizzes(*)')
-      .order('completed_at', { ascending: false });
-    
-    if (data) {
-      setAttempts(data as QuizAttempt[]);
+    if (!session?.user?.id) return;
+
+    try {
+      const response = await fetch('/api/quiz-attempts');
+      if (response.ok) {
+        const data = await response.json();
+        setAttempts(data);
+      }
+    } catch (error) {
+      console.error('Error loading quiz attempts:', error);
     }
   };
 

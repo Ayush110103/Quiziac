@@ -7,17 +7,17 @@ import { QuizCreator } from '@/components/quiz-creator';
 import { QuizPlayer } from '@/components/quiz-player';
 import { QuizCard } from '@/components/quiz-card';
 import { Brain, History, TrendingUp, Users, Sparkles, BookOpen } from 'lucide-react';
-import { Quiz } from '@/lib/supabase';
-import { createClient } from '@/lib/supabase-client';
+import { Quiz } from '@/lib/neon';
 import { MainLayout } from '@/components/layout/main-layout';
 import { useQuizPersistence } from '@/hooks/use-quiz-persistence';
+import { useSession } from 'next-auth/react';
 
 type QuizWithLastAttempt = Quiz & {
   last_attempt_completed_at?: string;
 };
 
 export default function Home() {
-  const supabase = createClient();
+  const { data: session } = useSession();
   const [currentView, setCurrentView] = useState<'home' | 'create' | 'play'>('home');
   const [recentQuizzes, setRecentQuizzes] = useState<QuizWithLastAttempt[]>([]);
   const [stats, setStats] = useState({
@@ -29,9 +29,11 @@ export default function Home() {
   const { quizState, startQuiz, clearQuiz, isLoading } = useQuizPersistence();
 
   useEffect(() => {
-    loadRecentQuizzes();
-    loadStats();
-  }, []);
+    if (session?.user?.id) {
+      loadRecentQuizzes();
+      loadStats();
+    }
+  }, [session?.user?.id]);
 
   // Check if there's an active quiz and show it
   useEffect(() => {
@@ -41,49 +43,30 @@ export default function Home() {
   }, [quizState, isLoading]);
 
   const loadRecentQuizzes = async () => {
-    const { data: quizzes } = await supabase
-      .from('quizzes')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(6);
-    
-    if (quizzes) {
-      const quizzesWithAttempts = await Promise.all(
-        quizzes.map(async (quiz) => {
-          const { data: lastAttempt, error } = await supabase
-            .from('quiz_attempts')
-            .select('completed_at')
-            .eq('quiz_id', quiz.id)
-            .order('completed_at', { ascending: false })
-            .limit(1)
-            .single();
+    if (!session?.user?.id) return;
 
-          return {
-            ...quiz,
-            last_attempt_completed_at: lastAttempt?.completed_at,
-          };
-        })
-      );
-      setRecentQuizzes(quizzesWithAttempts);
+    try {
+      const response = await fetch('/api/quizzes/recent');
+      if (response.ok) {
+        const quizzes = await response.json();
+        setRecentQuizzes(quizzes);
+      }
+    } catch (error) {
+      console.error('Error loading recent quizzes:', error);
     }
   };
 
   const loadStats = async () => {
-    const { data: quizzes } = await supabase.from('quizzes').select('id');
-    const { data: attempts } = await supabase.from('quiz_attempts').select('score, total_questions');
-    
-    if (quizzes && attempts) {
-      // Calculate average score as percentage
-      const totalPercentage = attempts.reduce((sum, attempt) => {
-        const percentage = (attempt.score / attempt.total_questions) * 100;
-        return sum + percentage;
-      }, 0);
-      
-      setStats({
-        totalQuizzes: quizzes.length,
-        totalAttempts: attempts.length,
-        averageScore: attempts.length > 0 ? Math.round(totalPercentage / attempts.length) : 0
-      });
+    if (!session?.user?.id) return;
+
+    try {
+      const response = await fetch('/api/stats');
+      if (response.ok) {
+        const statsData = await response.json();
+        setStats(statsData);
+      }
+    } catch (error) {
+      console.error('Error loading stats:', error);
     }
   };
 

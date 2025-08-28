@@ -6,10 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Clock, CheckCircle, XCircle, ArrowRight, ArrowLeft, Ban } from 'lucide-react';
-import { Quiz, Question, QuizAttempt } from '@/lib/supabase';
-import { createClient } from '@/lib/supabase-client';
+import { Quiz, Question, QuizAttempt } from '@/lib/neon';
 import { useRouter } from 'next/navigation';
 import { useQuizPersistence } from '@/hooks/use-quiz-persistence';
+import { useSession } from 'next-auth/react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,12 +29,12 @@ interface QuizPlayerProps {
 }
 
 export function QuizPlayer({ quiz, onComplete, onBack }: QuizPlayerProps) {
+  const { data: session } = useSession();
   const { quizState, updateQuizState, clearQuiz, initializeQuiz, isLoading, isCurrentQuiz } = useQuizPersistence();
   const [showResults, setShowResults] = useState(false);
   const [timeElapsed, setTimeElapsed] = useState(0);
   const [attempts, setAttempts] = useState<QuizAttempt[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const supabase = createClient();
 
   // Use persisted state or initialize new state
   const currentQuestionIndex = quizState?.currentQuestionIndex || 0;
@@ -101,14 +101,20 @@ export function QuizPlayer({ quiz, onComplete, onBack }: QuizPlayerProps) {
 
   useEffect(() => {
     const loadAttempts = async () => {
-      const { data } = await supabase
-        .from('quiz_attempts')
-        .select('*')
-        .order('completed_at', { ascending: false });
-      if (data) setAttempts(data as QuizAttempt[]);
+      if (!session?.user?.id) return;
+      
+      try {
+        const response = await fetch('/api/quiz-attempts');
+        if (response.ok) {
+          const data = await response.json();
+          setAttempts(data);
+        }
+      } catch (error) {
+        console.error('Error loading attempts:', error);
+      }
     };
     loadAttempts();
-  }, [supabase]);
+  }, [session?.user?.id]);
 
   const handleAnswerSelect = (answerIndex: number) => {
     console.log('Answer selected:', {
@@ -184,8 +190,7 @@ export function QuizPlayer({ quiz, onComplete, onBack }: QuizPlayerProps) {
     });
     console.log('=== END QUIZ FINISH DEBUG ===');
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    if (!session?.user?.id) {
       console.error('User not found, cannot save attempt');
       alert('You must be logged in to save your attempt.');
       setIsSubmitting(false);
@@ -193,29 +198,36 @@ export function QuizPlayer({ quiz, onComplete, onBack }: QuizPlayerProps) {
       return;
     }
     
-    const { data, error } = await supabase
-      .from('quiz_attempts')
-      .insert({
-        quiz_id: quiz.id,
-        score,
-        total_questions: quiz.questions.length,
-        answers: finalAnswers,
-        time_taken: timeTaken,
-        completed_at: new Date().toISOString(),
-        user_id: user.id,
-      })
-      .select()
-      .single<QuizAttempt>();
+    try {
+      const response = await fetch('/api/quiz-attempts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          quiz_id: quiz.id,
+          score,
+          total_questions: quiz.questions.length,
+          answers: finalAnswers,
+          time_taken: timeTaken,
+        }),
+      });
 
-    if (data && !error) {
-      console.log('Quiz attempt saved successfully:', data);
-      // Clear the persisted quiz state
-      clearQuiz();
-      // Call onComplete with the attempt data
-      onComplete(score, finalAnswers, timeTaken, data.id);
-      router.push(`/review/${data.id}`);
-    } else {
-      console.error('Failed to save attempt:', error);
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Quiz attempt saved successfully:', data);
+        // Clear the persisted quiz state
+        clearQuiz();
+        // Call onComplete with the attempt data
+        onComplete(score, finalAnswers, timeTaken, data.id);
+        router.push(`/review/${data.id}`);
+      } else {
+        console.error('Failed to save attempt:', response.statusText);
+        alert('Failed to save attempt!');
+        setIsSubmitting(false);
+      }
+    } catch (error) {
+      console.error('Error saving attempt:', error);
       alert('Failed to save attempt!');
       setIsSubmitting(false);
     }

@@ -1,59 +1,30 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
+import { getToken } from 'next-auth/jwt';
 
 export async function middleware(request: NextRequest) {
-    let response = NextResponse.next({
-        request: {
-            headers: request.headers,
-        },
+    const { pathname } = request.nextUrl;
+    const publicPaths = ['/login', '/signup', '/api/auth', '/api/signup'];
+
+    // Check if the path is public
+    const isPublicPath = publicPaths.some(p => pathname.startsWith(p));
+
+    // Get the token from the request
+    const token = await getToken({ 
+        req: request, 
+        secret: process.env.NEXTAUTH_SECRET 
     });
 
-    const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: {
-                get(name: string) {
-                    return request.cookies.get(name)?.value;
-                },
-                set(name: string, value: string, options) {
-                    request.cookies.set({ name, value, ...options });
-                    response = NextResponse.next({
-                        request: {
-                            headers: request.headers,
-                        },
-                    });
-                    response.cookies.set({ name, value, ...options });
-                },
-                remove(name: string, options) {
-                    request.cookies.set({ name, value: '', ...options });
-                    response = NextResponse.next({
-                        request: {
-                            headers: request.headers,
-                        },
-                    });
-                    response.cookies.set({ name, value: '', ...options });
-                },
-            },
-        }
-    );
-
-    const { data: { session } } = await supabase.auth.getSession();
-
-    const { pathname } = request.nextUrl;
-    const publicPaths = ['/login', '/signup', '/auth/callback', '/auth/auth-code-error'];
-
     // If user is not logged in and trying to access a protected route
-    if (!session && !publicPaths.some(p => pathname.startsWith(p))) {
+    if (!token && !isPublicPath) {
         return NextResponse.redirect(new URL('/login', request.url));
     }
 
     // If user is logged in and trying to access login or signup page
-    if (session && (pathname === '/login' || pathname === '/signup')) {
+    if (token && (pathname === '/login' || pathname === '/signup')) {
         return NextResponse.redirect(new URL('/', request.url));
     }
 
-    return response;
+    return NextResponse.next();
 }
 
 export const config = {

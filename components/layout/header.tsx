@@ -4,33 +4,16 @@ import { Brain, History, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase-client';
 import { useEffect, useState } from 'react';
-import type { User } from '@supabase/supabase-js';
 import Link from 'next/link';
+import { useSession, signOut } from 'next-auth/react';
 
 export function Header() {
   const router = useRouter();
-  const supabase = createClient();
-  const [user, setUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    // Initial fetch
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUser(user);
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [supabase.auth]);
+  const { data: session, status } = useSession();
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await signOut({ redirect: false });
     router.push('/login');
     router.refresh();
   };
@@ -51,7 +34,9 @@ export function Header() {
         </Link>
         <nav className="flex items-center gap-2">
           <ThemeToggle />
-          {user ? (
+          {status === 'loading' ? (
+            <div className="text-sm text-muted-foreground">Loading...</div>
+          ) : session?.user ? (
             <>
               <Button variant="ghost" size="sm" onClick={() => router.push('/history')}>
                 <History className="h-4 w-4 mr-2" />
@@ -62,7 +47,7 @@ export function Header() {
                 Logout
               </Button>
               <div className="text-sm text-muted-foreground hidden sm:block">
-                {user.email}
+                {session.user.email}
               </div>
             </>
           ) : (

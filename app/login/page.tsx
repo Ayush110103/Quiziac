@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase-client';
+import { signIn } from 'next-auth/react';
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,23 +13,31 @@ export default function LoginPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [message, setMessage] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
     const router = useRouter();
-    const supabase = createClient();
   
     const handleLogin = async (e: React.FormEvent) => {
       e.preventDefault();
       setMessage('');
+      setIsLoading(true);
   
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      try {
+        const result = await signIn('credentials', {
+          email,
+          password,
+          redirect: false,
+        });
   
-      if (error) {
-        setMessage(error.message);
-      } else {
-        router.push('/');
-        router.refresh();
+        if (result?.error) {
+          setMessage('Invalid email or password');
+        } else {
+          router.push('/');
+          router.refresh();
+        }
+      } catch (error) {
+        setMessage('An error occurred during login');
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -53,6 +61,7 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                disabled={isLoading}
               />
             </div>
             <div className="grid gap-2">
@@ -63,11 +72,12 @@ export default function LoginPage() {
                 required 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
               />
             </div>
             {message && <p className="text-red-500 text-sm">{message}</p>}
-            <Button type="submit" className="w-full">
-              Login
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? 'Logging in...' : 'Login'}
             </Button>
           </form>
           <div className="mt-4 text-center text-sm">

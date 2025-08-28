@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateQuiz } from '@/lib/gemini';
-import { createServerClient } from '@/lib/supabase-server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { sql } from '@/lib/neon';
 
 export async function POST(request: NextRequest) {
-  const supabase = createServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const session = await getServerSession(authOptions);
 
-  if (!user) {
+  if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -20,31 +21,18 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    
     const quizData = await generateQuiz({
       topic,
       difficulty,
       numQuestions: parseInt(numQuestions, 10)
     });
 
-    const { data: quiz, error } = await supabase
-      .from('quizzes')
-      .insert({
-        title: quizData.title,
-        topic,
-        difficulty,
-        questions: quizData.questions,
-        user_id: user.id,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Database error details:', error);
-      return NextResponse.json(
-        { error: `Failed to save quiz: ${error.message}` },
-        { status: 500 }
-      );
-    }
+    const [quiz] = await sql`
+      INSERT INTO quizzes (title, topic, difficulty, questions, user_id)
+      VALUES (${quizData.title}, ${topic}, ${difficulty}, ${JSON.stringify(quizData.questions)}, ${session.user.id})
+      RETURNING *
+    `;
 
     return NextResponse.json({ quiz });
   } catch (error) {

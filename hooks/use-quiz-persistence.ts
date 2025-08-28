@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Quiz } from '@/lib/supabase';
+import { Quiz } from '@/lib/neon';
 
 interface QuizState {
   quiz: Quiz;

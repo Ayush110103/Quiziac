@@ -1,0 +1,31 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { sql } from '@/lib/neon';
+
+export async function GET(request: NextRequest) {
+  try {
+    // Test database connection
+    await sql`SELECT 1 as health_check`;
+    
+    return NextResponse.json(
+      {
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        database: 'connected',
+        uptime: process.uptime(),
+      },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error('Health check failed:', error);
+    
+    return NextResponse.json(
+      {
+        status: 'unhealthy',
+        timestamp: new Date().toISOString(),
+        database: 'disconnected',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 503 }
+    );
+  }
+}
